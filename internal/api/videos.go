@@ -79,17 +79,16 @@ func (s *Server) getVideo(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	// Keep the library entry's metadata fresh.
-	entry, ok := s.store.GetEntry(id)
-	if !ok {
-		entry = config.Entry{ID: id, AddedAt: time.Now().Unix()}
+	// Resolving (playing) does not add to the library; it only refreshes the
+	// metadata of an entry the user explicitly saved.
+	if entry, ok := s.store.GetEntry(id); ok {
+		entry.Title = res.Title
+		entry.Channel = res.Channel
+		entry.ChannelID = res.ChannelID
+		entry.Thumbnail = res.Thumbnail
+		entry.Duration = res.Duration
+		_ = s.store.AddEntry(entry)
 	}
-	entry.Title = res.Title
-	entry.Channel = res.Channel
-	entry.ChannelID = res.ChannelID
-	entry.Thumbnail = res.Thumbnail
-	entry.Duration = res.Duration
-	_ = s.store.AddEntry(entry)
 
 	writeJSON(w, http.StatusOK, res)
 }

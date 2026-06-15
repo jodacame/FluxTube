@@ -1,9 +1,8 @@
 import { Routes, Route, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { Play, Plus, Link2, GripVertical } from "lucide-react";
-import { api } from "@/api";
-import { Button, Input, Spinner } from "@/components/ui";
+import { Play, Link2, GripVertical } from "lucide-react";
+import { Button, Input } from "@/components/ui";
 import { Sidebar, MobileNav } from "@/components/Sidebar";
 import { StatusBar } from "@/components/StatusBar";
 import { Home } from "@/views/Home";
@@ -18,23 +17,16 @@ import { extractId } from "@/util";
 function Toolbar() {
   const nav = useNavigate();
   const [link, setLink] = useState("");
-  const [busy, setBusy] = useState(false);
 
-  const go = async () => {
+  // Playing does not save to the library: a YouTube id/url goes straight to the
+  // player; anything else is treated as a search query.
+  const go = () => {
     const v = link.trim();
-    if (!v || busy) return;
-    setBusy(true);
-    try {
-      await api.add(v);
-      setLink("");
-      const id = extractId(v);
-      if (id) nav(`/app/watch/${id}`);
-      else nav("/");
-    } catch {
-      nav("/");
-    } finally {
-      setBusy(false);
-    }
+    if (!v) return;
+    const id = extractId(v);
+    setLink("");
+    if (id) nav(`/app/watch/${id}`);
+    else nav(`/app/search?q=${encodeURIComponent(v)}`);
   };
 
   return (
@@ -51,11 +43,11 @@ function Toolbar() {
       <div className="flex min-w-0 flex-1 items-center gap-2 sm:max-w-md">
         <div className="relative flex-1">
           <Link2 className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={link} onChange={(e) => setLink(e.target.value)} onKeyDown={(e) => e.key === "Enter" && go()} placeholder="Paste a YouTube ID or URL…" className="h-8 pl-8" />
+          <Input value={link} onChange={(e) => setLink(e.target.value)} onKeyDown={(e) => e.key === "Enter" && go()} placeholder="Play a YouTube ID/URL or search…" className="h-8 pl-8" />
         </div>
-        <Button size="sm" className="h-8" onClick={go} disabled={busy || !link.trim()}>
-          {busy ? <Spinner /> : <Plus className="size-4" />}
-          <span className="hidden sm:inline">Add</span>
+        <Button size="sm" className="h-8" onClick={go} disabled={!link.trim()}>
+          <Play className="size-4" fill="currentColor" />
+          <span className="hidden sm:inline">Go</span>
         </Button>
       </div>
       <div className="ml-auto hidden items-center gap-1.5 pr-1 text-xs text-muted-foreground md:flex">

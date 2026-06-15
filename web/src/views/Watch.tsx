@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
+import { Bookmark } from "lucide-react";
 import { api, type Resolved, type DiscoverVideo } from "@/api";
 import { history } from "@/store";
 import { fmtViews } from "@/util";
@@ -50,9 +51,12 @@ export function Watch() {
         {info && (
           <div className="space-y-2">
             <h1 className="text-lg font-semibold leading-snug">{info.title}</h1>
-            <Link to={`/app/channel/${info.channelId}`} className="inline-block text-sm font-medium text-muted-foreground hover:text-foreground">
-              {info.channel}
-            </Link>
+            <div className="flex items-center justify-between gap-2">
+              <Link to={`/app/channel/${info.channelId}`} className="text-sm font-medium text-muted-foreground hover:text-foreground">
+                {info.channel}
+              </Link>
+              <SaveButton id={id} />
+            </div>
             <div className="flex flex-wrap gap-2 pt-1 text-xs text-muted-foreground">
               {info.video[0] && <Badge>{info.video[0].label}</Badge>}
               {info.audio.length > 0 && <Badge>{info.audio.length} audio</Badge>}
@@ -79,6 +83,48 @@ export function Watch() {
         ))}
       </aside>
     </div>
+  );
+}
+
+// SaveButton adds or removes the video from the persistent library. Playing a
+// video never saves it; saving is always an explicit action.
+function SaveButton({ id }: { id: string }) {
+  const [saved, setSaved] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api.list().then((list) => setSaved(list.some((v) => v.id === id))).catch(() => {});
+  }, [id]);
+
+  const toggle = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      if (saved) {
+        await api.remove(id);
+        setSaved(false);
+      } else {
+        await api.add(id);
+        setSaved(true);
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={toggle}
+      disabled={busy}
+      className={`flex shrink-0 items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
+        saved ? "border-primary/40 bg-primary/15 text-foreground" : "border-border text-muted-foreground hover:bg-accent"
+      }`}
+    >
+      <Bookmark className={`size-4 ${saved ? "fill-current text-primary" : ""}`} />
+      {saved ? "Saved" : "Save"}
+    </button>
   );
 }
 
