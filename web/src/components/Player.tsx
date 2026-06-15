@@ -32,14 +32,41 @@ export function Player({ id, subs, poster }: { id: string; subs: SubTrack[]; pos
 }
 
 function Progressive({ id, subs, poster }: { id: string; subs: SubTrack[]; poster?: string }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [sel, setSel] = useState(-1); // -1 = subtitles off
+
+  // Take explicit control of which text track is shown so the browser never
+  // displays two at once (default attribute + language auto-select).
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const apply = () => {
+      const tt = v.textTracks;
+      for (let i = 0; i < tt.length; i++) tt[i].mode = i === sel ? "showing" : "disabled";
+    };
+    apply();
+    v.textTracks.addEventListener?.("addtrack", apply);
+    return () => v.textTracks.removeEventListener?.("addtrack", apply);
+  }, [sel, id]);
+
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-black">
-      <video key={`prog-${id}`} poster={poster} controls playsInline crossOrigin="anonymous" className="aspect-video w-full bg-black">
-        <source src={api.progressiveUrl(id)} />
-        {subs.map((s, i) => (
-          <track key={s.lang} kind="subtitles" src={api.subUrl(id, s.lang)} srcLang={s.lang} label={s.name || s.lang} default={i === 0 && !s.auto} />
-        ))}
-      </video>
+    <div className="space-y-2">
+      <div className="overflow-hidden rounded-lg border border-border bg-black">
+        <video ref={videoRef} key={`prog-${id}`} poster={poster} controls playsInline crossOrigin="anonymous" className="aspect-video w-full bg-black">
+          <source src={api.progressiveUrl(id)} />
+          {subs.map((s) => (
+            <track key={s.lang} kind="subtitles" src={api.subUrl(id, s.lang)} srcLang={s.lang} label={s.name || s.lang} />
+          ))}
+        </video>
+      </div>
+      {subs.length > 0 && (
+        <Select
+          label="Subtitles"
+          tracks={[{ id: -1, name: "Off" }, ...subs.map((s, i) => ({ id: i, name: (s.name || s.lang) + (s.auto ? " (auto)" : "") }))]}
+          value={sel}
+          onChange={setSel}
+        />
+      )}
     </div>
   );
 }
@@ -71,6 +98,8 @@ function HlsPlayer({ id, poster }: { id: string; poster?: string }) {
       });
       hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => {
         setSubTracks(hls.subtitleTracks.map((t, i) => ({ id: i, name: t.name || t.lang || `Sub ${i + 1}` })));
+        hls.subtitleTrack = -1; // start with subtitles off; user opts in
+        setSubId(-1);
       });
       hls.on(Hls.Events.ERROR, (_e, data) => {
         if (data.fatal) setError(`Playback error: ${data.details}`);
