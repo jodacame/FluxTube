@@ -32,31 +32,19 @@ export function Player({ id, subs, poster }: { id: string; subs: SubTrack[]; pos
 }
 
 function Progressive({ id, subs, poster }: { id: string; subs: SubTrack[]; poster?: string }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
   const [sel, setSel] = useState(-1); // -1 = subtitles off
+  const current = sel >= 0 && sel < subs.length ? subs[sel] : null;
 
-  // Take explicit control of which text track is shown so the browser never
-  // displays two at once (default attribute + language auto-select).
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    const apply = () => {
-      const tt = v.textTracks;
-      for (let i = 0; i < tt.length; i++) tt[i].mode = i === sel ? "showing" : "disabled";
-    };
-    apply();
-    v.textTracks.addEventListener?.("addtrack", apply);
-    return () => v.textTracks.removeEventListener?.("addtrack", apply);
-  }, [sel, id]);
-
+  // A single <track> element (keyed by language) guarantees only one subtitle
+  // can ever be shown — switching languages replaces the one track.
   return (
     <div className="space-y-2">
       <div className="overflow-hidden rounded-lg border border-border bg-black">
-        <video ref={videoRef} key={`prog-${id}`} poster={poster} controls playsInline crossOrigin="anonymous" className="aspect-video w-full bg-black">
+        <video key={`prog-${id}`} poster={poster} controls playsInline crossOrigin="anonymous" className="aspect-video w-full bg-black">
           <source src={api.progressiveUrl(id)} />
-          {subs.map((s) => (
-            <track key={s.lang} kind="subtitles" src={api.subUrl(id, s.lang)} srcLang={s.lang} label={s.name || s.lang} />
-          ))}
+          {current && (
+            <track key={current.lang} kind="subtitles" src={api.subUrl(id, current.lang)} srcLang={current.lang} label={current.name || current.lang} default />
+          )}
         </video>
       </div>
       {subs.length > 0 && (
