@@ -198,9 +198,13 @@ func (s *session) runFFmpeg(r *rendition, base int, ctx context.Context) {
 	if base > 0 {
 		args = append(args, "-ss", itoa(base*seg))
 	}
+	args = append(args, "-i", r.src, "-map", "0", "-c", "copy")
+	if base > 0 {
+		// Place the restarted segments at their real position on the timeline
+		// (input -ss reset timestamps to 0) without copying odd source ts.
+		args = append(args, "-output_ts_offset", itoa(base*seg))
+	}
 	args = append(args,
-		"-i", r.src,
-		"-map", "0", "-c", "copy", "-copyts",
 		"-f", "hls",
 		"-hls_time", itoa(seg),
 		"-hls_list_size", "0",
