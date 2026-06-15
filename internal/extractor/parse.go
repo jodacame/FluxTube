@@ -9,15 +9,15 @@ import (
 
 // rawInfo mirrors the subset of yt-dlp's JSON we consume.
 type rawInfo struct {
-	ID                string                  `json:"id"`
-	Title             string                  `json:"title"`
-	Channel           string                  `json:"channel"`
-	ChannelID         string                  `json:"channel_id"`
-	Uploader          string                  `json:"uploader"`
-	Duration          float64                 `json:"duration"`
-	Thumbnail         string                  `json:"thumbnail"`
-	Description       string                  `json:"description"`
-	Formats           []rawFormat             `json:"formats"`
+	ID                string                   `json:"id"`
+	Title             string                   `json:"title"`
+	Channel           string                   `json:"channel"`
+	ChannelID         string                   `json:"channel_id"`
+	Uploader          string                   `json:"uploader"`
+	Duration          float64                  `json:"duration"`
+	Thumbnail         string                   `json:"thumbnail"`
+	Description       string                   `json:"description"`
+	Formats           []rawFormat              `json:"formats"`
 	Subtitles         map[string][]rawSubtitle `json:"subtitles"`
 	AutomaticCaptions map[string][]rawSubtitle `json:"automatic_captions"`
 }
@@ -48,8 +48,9 @@ type rawSubtitle struct {
 
 func has(codec string) bool { return codec != "" && codec != "none" }
 
-// parseInfo converts raw yt-dlp info into a Resolved result.
-func parseInfo(r *rawInfo) *Resolved {
+// parseInfo converts raw yt-dlp info into a Resolved result. allowedAuto limits
+// which automatically generated caption languages are exposed.
+func parseInfo(r *rawInfo, allowedAuto map[string]bool) *Resolved {
 	res := &Resolved{
 		Meta: Meta{
 			ID:          r.ID,
@@ -93,7 +94,7 @@ func parseInfo(r *rawInfo) *Resolved {
 	}
 
 	dedupeAudioByLang(res)
-	res.Subs = collectSubs(r)
+	res.Subs = collectSubs(r, allowedAuto)
 
 	// Highest quality first.
 	sort.SliceStable(res.Video, func(i, j int) bool { return res.Video[i].Height > res.Video[j].Height })
@@ -128,8 +129,10 @@ func dedupeAudioByLang(res *Resolved) {
 }
 
 // collectSubs merges manual and automatic captions, preferring WebVTT and
-// avoiding duplicate languages (manual wins over automatic).
-func collectSubs(r *rawInfo) []SubTrack {
+// avoiding duplicate languages (manual wins over automatic). Manual subtitles
+// are always kept; automatic captions are limited to allowedAuto (plus the
+// channel's original-language track) to avoid exposing ~150 languages.
+func collectSubs(r *rawInfo, allowedAuto map[string]bool) []SubTrack {
 	seen := map[string]bool{}
 	var out []SubTrack
 	add := func(lang string, list []rawSubtitle, auto bool) {
@@ -147,6 +150,9 @@ func collectSubs(r *rawInfo) []SubTrack {
 		add(lang, list, false)
 	}
 	for lang, list := range r.AutomaticCaptions {
+		if !allowedAuto[lang] && !allowedAuto[baseLang(lang)] && !strings.HasSuffix(lang, "-orig") {
+			continue
+		}
 		add(lang, list, true)
 	}
 	sort.SliceStable(out, func(i, j int) bool {
@@ -238,6 +244,14 @@ func audioName(f rawFormat) string {
 func subName(s rawSubtitle, lang string) string {
 	if s.Name != "" {
 		return s.Name
+	}
+	return lang
+}
+
+// baseLang returns the primary subtag of a language code (e.g. "es" for "es-419").
+func baseLang(lang string) string {
+	if i := strings.IndexAny(lang, "-_"); i > 0 {
+		return lang[:i]
 	}
 	return lang
 }

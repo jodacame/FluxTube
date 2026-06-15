@@ -11,8 +11,8 @@ func TestNormalizeID(t *testing.T) {
 		"dQw4w9WgXcQ": "dQw4w9WgXcQ",
 		"https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=10s": "dQw4w9WgXcQ",
 		"https://youtu.be/dQw4w9WgXcQ":                      "dQw4w9WgXcQ",
-		"https://www.youtube.com/shorts/dQw4w9WgXcQ":         "dQw4w9WgXcQ",
-		"https://www.youtube.com/embed/dQw4w9WgXcQ":          "dQw4w9WgXcQ",
+		"https://www.youtube.com/shorts/dQw4w9WgXcQ":        "dQw4w9WgXcQ",
+		"https://www.youtube.com/embed/dQw4w9WgXcQ":         "dQw4w9WgXcQ",
 	}
 	for in, want := range cases {
 		got, err := NormalizeID(in)
@@ -48,7 +48,7 @@ func TestParseInfoAdaptive(t *testing.T) {
 	if err := json.Unmarshal([]byte(adaptiveJSON), &raw); err != nil {
 		t.Fatal(err)
 	}
-	res := parseInfo(&raw)
+	res := parseInfo(&raw, map[string]bool{"en": true, "fr": true})
 
 	if res.Duration != 100 {
 		t.Errorf("duration = %d, want 100", res.Duration)

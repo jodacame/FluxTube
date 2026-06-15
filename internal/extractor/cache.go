@@ -28,9 +28,9 @@ type call struct {
 // cache is a small TTL cache with single-flight de-duplication and a negative
 // cache to minimise upstream requests.
 type cache struct {
-	mu      sync.Mutex
-	items   map[string]entry
-	neg     map[string]negEntry
+	mu       sync.Mutex
+	items    map[string]entry
+	neg      map[string]negEntry
 	inflight map[string]*call
 }
 

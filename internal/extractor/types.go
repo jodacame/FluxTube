@@ -22,17 +22,17 @@ type Meta struct {
 
 // VideoFormat is a single video-only (or progressive) rendition.
 type VideoFormat struct {
-	ID          string `json:"id"`
-	Width       int    `json:"width"`
-	Height      int    `json:"height"`
-	FPS         int    `json:"fps"`
-	Codec       string `json:"codec"`
-	Ext         string `json:"ext"`
-	Bitrate     int    `json:"bitrate"` // kbps
-	HDR         bool   `json:"hdr"`
-	HasAudio    bool   `json:"hasAudio"` // true for progressive formats
-	URL         string `json:"-"`        // CDN URL, never exposed to clients
-	Label       string `json:"label"`    // e.g. "1080p60 HDR"
+	ID       string `json:"id"`
+	Width    int    `json:"width"`
+	Height   int    `json:"height"`
+	FPS      int    `json:"fps"`
+	Codec    string `json:"codec"`
+	Ext      string `json:"ext"`
+	Bitrate  int    `json:"bitrate"` // kbps
+	HDR      bool   `json:"hdr"`
+	HasAudio bool   `json:"hasAudio"` // true for progressive formats
+	URL      string `json:"-"`        // CDN URL, never exposed to clients
+	Label    string `json:"label"`    // e.g. "1080p60 HDR"
 }
 
 // AudioTrack is a single audio-only rendition for one language.

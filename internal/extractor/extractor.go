@@ -21,6 +21,7 @@ type Options struct {
 	CacheTTL     time.Duration // how long a resolve stays fresh (before CDN URLs expire)
 	NegTTL       time.Duration // how long a failure is remembered
 	Timeout      time.Duration // per-resolve timeout
+	AutoSubLangs []string      // languages for which automatic captions are exposed (manual subs always kept)
 }
 
 func (o *Options) withDefaults() {
@@ -35,6 +36,11 @@ func (o *Options) withDefaults() {
 	}
 	if o.Timeout == 0 {
 		o.Timeout = 90 * time.Second
+	}
+	if o.AutoSubLangs == nil {
+		// A video can expose ~150 auto-caption languages; expose only a sane
+		// default set so playlists stay usable. Manual subtitles are always kept.
+		o.AutoSubLangs = []string{"en", "es"}
 	}
 }
 
@@ -190,7 +196,11 @@ func (e *Extractor) runResolve(ctx context.Context, id string) (*Resolved, error
 	if err := json.Unmarshal(out, &raw); err != nil {
 		return nil, fmt.Errorf("parse yt-dlp output: %w", err)
 	}
-	res := parseInfo(&raw)
+	allowedAuto := map[string]bool{}
+	for _, l := range e.opt.AutoSubLangs {
+		allowedAuto[l] = true
+	}
+	res := parseInfo(&raw, allowedAuto)
 	if len(res.Video) == 0 && len(res.Progressive) == 0 {
 		return nil, errors.New("no playable formats available")
 	}
