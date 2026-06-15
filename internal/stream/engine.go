@@ -32,6 +32,7 @@ type Options struct {
 	UserAgent        string
 	GCInterval       time.Duration
 	DefaultMaxHeight int // default video height cap (0 = best available)
+	MaxSizeMB        int // total on-disk cache cap (0 = unbounded)
 }
 
 func (o *Options) withDefaults() {
@@ -192,7 +193,35 @@ func (e *Engine) gcLoop() {
 			return
 		case <-t.C:
 			e.gcOnce()
+			e.enforceDiskCap()
 		}
+	}
+}
+
+// enforceDiskCap evicts least-recently-used sessions until the on-disk cache is
+// under the configured size cap. The currently active session is never evicted,
+// so playback is not interrupted.
+func (e *Engine) enforceDiskCap() {
+	if e.opt.MaxSizeMB <= 0 {
+		return
+	}
+	limit := int64(e.opt.MaxSizeMB) << 20
+	for dirSize(e.opt.CacheRoot) > limit {
+		e.mu.Lock()
+		if len(e.sessions) <= 1 {
+			e.mu.Unlock()
+			return
+		}
+		var oldest *session
+		var oid string
+		for id, s := range e.sessions {
+			if oldest == nil || s.lastAccess().Before(oldest.lastAccess()) {
+				oldest, oid = s, id
+			}
+		}
+		delete(e.sessions, oid)
+		e.mu.Unlock()
+		oldest.close()
 	}
 }
 

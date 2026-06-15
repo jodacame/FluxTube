@@ -21,6 +21,18 @@ func clearDir(dir string) error {
 
 func itoa(n int) string { return strconv.Itoa(n) }
 
+// dirSize returns the total size in bytes of all files under dir.
+func dirSize(dir string) int64 {
+	var total int64
+	_ = filepath.Walk(dir, func(_ string, info os.FileInfo, err error) error {
+		if err == nil && !info.IsDir() {
+			total += info.Size()
+		}
+		return nil
+	})
+	return total
+}
+
 // safeName guards path components against traversal and unexpected separators.
 func safeName(s string) bool {
 	if s == "" || s == "." || s == ".." {

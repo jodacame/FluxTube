@@ -54,6 +54,7 @@ func main() {
 		MaxSessions:      cfg.Limits.MaxSessions,
 		MaxFFmpeg:        cfg.Limits.MaxFFmpeg,
 		DefaultMaxHeight: cfg.Quality.DefaultMaxHeight,
+		MaxSizeMB:        cfg.Cache.MaxSizeMB,
 	})
 	if err != nil {
 		log.Fatalf("engine: %v", err)
