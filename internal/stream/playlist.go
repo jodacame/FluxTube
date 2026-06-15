@@ -82,6 +82,36 @@ func buildMaster(s *session) []byte {
 	return []byte(b.String())
 }
 
+// buildMediaPlaylist renders a complete VOD media playlist covering the whole
+// duration up front, so players expose the full timeline and can seek anywhere.
+// Segments are produced on demand when requested.
+func buildMediaPlaylist(duration, segSeconds int) []byte {
+	if segSeconds <= 0 {
+		segSeconds = 6
+	}
+	if duration <= 0 {
+		duration = segSeconds
+	}
+	count := (duration + segSeconds - 1) / segSeconds
+
+	var b strings.Builder
+	b.WriteString("#EXTM3U\n#EXT-X-VERSION:7\n")
+	b.WriteString("#EXT-X-TARGETDURATION:" + strconv.Itoa(segSeconds) + "\n")
+	b.WriteString("#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:VOD\n#EXT-X-INDEPENDENT-SEGMENTS\n")
+	b.WriteString("#EXT-X-MAP:URI=\"init.mp4\"\n")
+	remaining := duration
+	for i := 0; i < count; i++ {
+		d := segSeconds
+		if remaining < segSeconds {
+			d = remaining
+		}
+		b.WriteString(fmt.Sprintf("#EXTINF:%d.000,\n%s\n", d, segName(i)))
+		remaining -= segSeconds
+	}
+	b.WriteString("#EXT-X-ENDLIST\n")
+	return []byte(b.String())
+}
+
 // buildSubtitlePlaylist returns a single-segment VOD playlist for a WebVTT track.
 func buildSubtitlePlaylist(lang string, duration int) []byte {
 	if duration <= 0 {

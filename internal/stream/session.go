@@ -96,20 +96,25 @@ func (s *session) sourceFor(track string) (string, bool) {
 	return "", false
 }
 
-// rendition lazily runs ffmpeg to remux a single source into an fMP4 HLS
-// rendition under the session directory.
+// segAhead is how many segments past the production front a request may be
+// before we restart the generator at the requested position (a forward seek).
+const segAhead = 10
+
+// rendition runs ffmpeg to remux one source into fMP4 HLS segments. The
+// generator can be (re)started at any segment offset so seeking beyond the
+// produced buffer works: we serve our own full VOD playlist and produce the
+// requested region on demand.
 type rendition struct {
-	dir    string
-	once   sync.Once
-	mu     sync.Mutex
-	cmd    *exec.Cmd
-	cancel context.CancelFunc
-	done   bool
-	err    error
+	dir     string
+	src     string
+	mu      sync.Mutex
+	cancel  context.CancelFunc
+	baseSeg int
+	started bool
 }
 
-// ensure starts the generator for a track if not already running.
-func (s *session) ensure(track string) (*rendition, error) {
+// ensureRendition returns (creating if needed) the rendition for a track.
+func (s *session) ensureRendition(track string) (*rendition, error) {
 	src, ok := s.sourceFor(track)
 	if !ok {
 		return nil, os.ErrNotExist
@@ -117,65 +122,101 @@ func (s *session) ensure(track string) (*rendition, error) {
 	s.mu.Lock()
 	r := s.renditions[track]
 	if r == nil {
-		r = &rendition{dir: filepath.Join(s.dir, track)}
+		r = &rendition{dir: filepath.Join(s.dir, track), src: src}
 		s.renditions[track] = r
+		_ = os.MkdirAll(r.dir, 0o755)
 	}
 	s.mu.Unlock()
-
-	r.once.Do(func() {
-		_ = os.MkdirAll(r.dir, 0o755)
-		go s.runFFmpeg(r, src)
-	})
 	return r, nil
 }
 
-// runFFmpeg remuxes the source into fMP4 HLS segments with stream copy.
-func (s *session) runFFmpeg(r *rendition, src string) {
-	// Respect the global ffmpeg concurrency cap.
+// ensureInit makes sure a generator is running so the init segment exists.
+func (s *session) ensureInit(track string) (*rendition, error) {
+	r, err := s.ensureRendition(track)
+	if err != nil {
+		return nil, err
+	}
+	r.mu.Lock()
+	if !r.started {
+		s.startGenerator(r, 0)
+	}
+	r.mu.Unlock()
+	return r, nil
+}
+
+// ensureSegment makes sure segment n is being (or has been) produced, starting
+// or restarting the generator at n when n falls outside the active window.
+func (s *session) ensureSegment(track string, n int) (*rendition, error) {
+	r, err := s.ensureRendition(track)
+	if err != nil {
+		return nil, err
+	}
+	if fileExists(filepath.Join(r.dir, segName(n))) {
+		return r, nil
+	}
+	r.mu.Lock()
+	last := maxSegIndex(r.dir)
+	if !r.started || n < r.baseSeg || n > last+segAhead {
+		// Start one segment earlier so the requested segment is reliably
+		// covered even when the keyframe lands just before its boundary.
+		base := n - 1
+		if base < 0 {
+			base = 0
+		}
+		s.startGenerator(r, base)
+	}
+	r.mu.Unlock()
+	return r, nil
+}
+
+// startGenerator (re)starts ffmpeg producing segments from segment base.
+// Caller must hold r.mu.
+func (s *session) startGenerator(r *rendition, base int) {
+	if r.cancel != nil {
+		r.cancel()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	r.cancel = cancel
+	r.baseSeg = base
+	r.started = true
+	go s.runFFmpeg(r, base, ctx)
+}
+
+// runFFmpeg remuxes from the segment-aligned offset using stream copy. Source
+// timestamps are preserved (-copyts) so segments land at the right point on the
+// timeline regardless of where generation started, and -start_number keeps the
+// filenames aligned with the global segment index.
+func (s *session) runFFmpeg(r *rendition, base int, ctx context.Context) {
 	s.e.sem <- struct{}{}
 	defer func() { <-s.e.sem }()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	seg := s.e.opt.SegmentSeconds
 	args := []string{
 		"-nostdin", "-hide_banner", "-loglevel", "error", "-y",
 		"-user_agent", s.e.opt.UserAgent,
-		"-i", src,
-		"-map", "0", "-c", "copy",
-		"-f", "hls",
-		"-hls_time", itoa(s.e.opt.SegmentSeconds),
-		"-hls_list_size", "0",
-		// EVENT (not VOD) so ffmpeg writes the playlist incrementally as each
-		// segment is produced; it is appended-only and gains ENDLIST on
-		// completion, which players treat as a seekable VOD.
-		"-hls_playlist_type", "event",
-		"-hls_segment_type", "fmp4",
-		"-hls_flags", "independent_segments",
-		"-hls_fmp4_init_filename", "init.mp4",
-		"-hls_segment_filename", filepath.Join(r.dir, "seg%05d.m4s"),
-		filepath.Join(r.dir, "index.m3u8"),
 	}
+	if base > 0 {
+		args = append(args, "-ss", itoa(base*seg))
+	}
+	args = append(args,
+		"-i", r.src,
+		"-map", "0", "-c", "copy", "-copyts",
+		"-f", "hls",
+		"-hls_time", itoa(seg),
+		"-hls_list_size", "0",
+		"-hls_flags", "independent_segments+append_list+omit_endlist",
+		"-hls_segment_type", "fmp4",
+		"-hls_fmp4_init_filename", "init.mp4",
+		"-start_number", itoa(base),
+		"-hls_segment_filename", filepath.Join(r.dir, "seg%05d.m4s"),
+		filepath.Join(r.dir, "_ff.m3u8"),
+	)
 	cmd := exec.CommandContext(ctx, s.e.opt.FFmpegPath, args...)
 	if logf, lerr := os.Create(filepath.Join(r.dir, "ffmpeg.log")); lerr == nil {
 		cmd.Stderr = logf
 		defer logf.Close()
 	}
-	r.mu.Lock()
-	r.cmd = cmd
-	r.cancel = cancel
-	r.mu.Unlock()
-
-	err := cmd.Run()
-
-	r.mu.Lock()
-	r.done = true
-	r.err = err
-	r.mu.Unlock()
-}
-
-func (r *rendition) isDone() bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.done
+	_ = cmd.Run()
 }
 
 func (r *rendition) stop() {

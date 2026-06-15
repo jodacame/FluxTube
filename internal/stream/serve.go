@@ -26,8 +26,9 @@ func (e *Engine) Master(ctx context.Context, id string, sel Selection) ([]byte, 
 	return buildMaster(s), nil
 }
 
-// ServeRendition serves a generated rendition file (index.m3u8, init.mp4 or a
-// segment), starting the generator on demand and waiting briefly for segments.
+// ServeRendition serves a rendition artifact: the full VOD media playlist
+// (generated, so the client can seek anywhere), the init segment, or a media
+// segment (produced on demand, restarting the generator on a forward seek).
 func (e *Engine) ServeRendition(ctx context.Context, w http.ResponseWriter, r *http.Request, id, track, file string) error {
 	if !safeName(track) || !safeName(file) {
 		http.Error(w, "bad request", http.StatusBadRequest)
@@ -37,20 +38,48 @@ func (e *Engine) ServeRendition(ctx context.Context, w http.ResponseWriter, r *h
 	if err != nil {
 		return err
 	}
-	rd, err := s.ensure(track)
-	if err != nil {
-		http.Error(w, "unknown track", http.StatusNotFound)
-		return nil
-	}
 
-	path := filepath.Join(rd.dir, file)
-	if err := waitFor(rd, file, path, 30*time.Second); err != nil {
-		http.Error(w, "not ready", http.StatusGatewayTimeout)
+	switch {
+	case file == "index.m3u8":
+		setStreamHeaders(w, file)
+		_, _ = w.Write(buildMediaPlaylist(s.res.Duration, e.opt.SegmentSeconds))
+		return nil
+
+	case file == "init.mp4":
+		rd, err := s.ensureInit(track)
+		if err != nil {
+			http.Error(w, "unknown track", http.StatusNotFound)
+			return nil
+		}
+		path := filepath.Join(rd.dir, "init.mp4")
+		if !waitFileExists(path, 30*time.Second) {
+			http.Error(w, "not ready", http.StatusGatewayTimeout)
+			return nil
+		}
+		setStreamHeaders(w, file)
+		http.ServeFile(w, r, path)
+		return nil
+
+	default: // segment
+		n, ok := parseSegName(file)
+		if !ok {
+			http.Error(w, "not found", http.StatusNotFound)
+			return nil
+		}
+		rd, err := s.ensureSegment(track, n)
+		if err != nil {
+			http.Error(w, "unknown track", http.StatusNotFound)
+			return nil
+		}
+		path := filepath.Join(rd.dir, file)
+		if !waitSegment(rd.dir, file, path, 30*time.Second) {
+			http.Error(w, "not ready", http.StatusGatewayTimeout)
+			return nil
+		}
+		setStreamHeaders(w, file)
+		http.ServeFile(w, r, path)
 		return nil
 	}
-	setStreamHeaders(w, file)
-	http.ServeFile(w, r, path)
-	return nil
 }
 
 // Subtitle proxies a subtitle track as WebVTT.
@@ -117,28 +146,33 @@ type Selection struct {
 	Height int // max video height, 0 = best
 }
 
-// waitFor blocks until a rendition file is ready to serve or the generator
-// finishes. For segments, readiness means the playlist already lists the file
-// (so it is fully written); for other files, existence is enough.
-func waitFor(rd *rendition, file, path string, timeout time.Duration) error {
+// waitFileExists polls until a file exists or the timeout elapses.
+func waitFileExists(path string, timeout time.Duration) bool {
 	deadline := time.Now().Add(timeout)
-	isSeg := strings.HasSuffix(file, ".m4s")
 	for {
-		if isSeg {
-			if playlistHas(filepath.Join(rd.dir, "index.m3u8"), file) {
-				return nil
-			}
-		} else if _, err := os.Stat(path); err == nil {
-			return nil
-		}
-		if rd.isDone() {
-			if _, err := os.Stat(path); err == nil {
-				return nil
-			}
-			return ErrNotReady
+		if _, err := os.Stat(path); err == nil {
+			return true
 		}
 		if time.Now().After(deadline) {
-			return ErrNotReady
+			return false
+		}
+		time.Sleep(120 * time.Millisecond)
+	}
+}
+
+// waitSegment blocks until a segment is fully written, which the generator's
+// internal playlist signals by listing it.
+func waitSegment(dir, file, path string, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	ff := filepath.Join(dir, "_ff.m3u8")
+	for {
+		if playlistHas(ff, file) {
+			return true
+		}
+		if time.Now().After(deadline) {
+			// Fall back to plain existence in case the playlist lags.
+			_, err := os.Stat(path)
+			return err == nil
 		}
 		time.Sleep(120 * time.Millisecond)
 	}
