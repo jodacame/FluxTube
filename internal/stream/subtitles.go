@@ -32,12 +32,34 @@ func serveVTT(ctx context.Context, w http.ResponseWriter, ua, src string) error 
 		http.Error(w, "subtitle read error", http.StatusBadGateway)
 		return nil
 	}
-	text := string(body)
-	if !strings.HasPrefix(strings.TrimSpace(text), "WEBVTT") {
-		text = "WEBVTT\n\n" + text
-	}
+	text := normalizeVTT(string(body))
 	w.Header().Set("Content-Type", "text/vtt; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	_, _ = io.WriteString(w, text)
 	return nil
+}
+
+// normalizeVTT ensures a WEBVTT header and strips per-cue positioning settings
+// (align/position/line/size) that YouTube adds, which otherwise push captions
+// off-centre. Without those settings players default to bottom-centre.
+func normalizeVTT(text string) string {
+	lines := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
+	for i, line := range lines {
+		if idx := strings.Index(line, "-->"); idx >= 0 {
+			// Keep "<start> --> <end>" and drop any trailing cue settings.
+			start := strings.TrimSpace(line[:idx])
+			rest := strings.TrimSpace(line[idx+3:])
+			fields := strings.Fields(rest)
+			end := ""
+			if len(fields) > 0 {
+				end = fields[0]
+			}
+			lines[i] = start + " --> " + end
+		}
+	}
+	out := strings.Join(lines, "\n")
+	if !strings.HasPrefix(strings.TrimSpace(out), "WEBVTT") {
+		out = "WEBVTT\n\n" + out
+	}
+	return out
 }
