@@ -75,12 +75,28 @@ func NewService(p Provider, ttl time.Duration) *Service {
 	if ttl <= 0 {
 		ttl = 10 * time.Minute
 	}
-	return &Service{
+	s := &Service{
 		p:        p,
 		ttl:      ttl,
 		items:    map[string]cacheItem{},
 		inflight: map[string]*flight{},
 	}
+	// Drop expired entries periodically so memory stays bounded.
+	go func() {
+		t := time.NewTicker(5 * time.Minute)
+		defer t.Stop()
+		for range t.C {
+			now := time.Now()
+			s.mu.Lock()
+			for k, v := range s.items {
+				if now.After(v.exp) {
+					delete(s.items, k)
+				}
+			}
+			s.mu.Unlock()
+		}
+	}()
+	return s
 }
 
 // do runs fn for key, serving a cached value when fresh and coalescing

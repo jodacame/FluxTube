@@ -54,11 +54,20 @@ type Extractor struct {
 // New creates an Extractor with the given options.
 func New(opt Options) *Extractor {
 	opt.withDefaults()
-	return &Extractor{
+	e := &Extractor{
 		opt:   opt,
 		cache: newCache(),
 		http:  &http.Client{Timeout: 15 * time.Second},
 	}
+	// Periodically drop expired entries so memory stays bounded.
+	go func() {
+		t := time.NewTicker(10 * time.Minute)
+		defer t.Stop()
+		for range t.C {
+			e.cache.prune()
+		}
+	}()
+	return e
 }
 
 // SetCookies updates the cookies file used for subsequent resolves.

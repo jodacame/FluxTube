@@ -82,3 +82,20 @@ func (c *cache) drop(id string) {
 	delete(c.neg, id)
 	c.mu.Unlock()
 }
+
+// prune removes expired entries so memory stays bounded over time.
+func (c *cache) prune() {
+	now := time.Now()
+	c.mu.Lock()
+	for k, v := range c.items {
+		if now.After(v.exp) {
+			delete(c.items, k)
+		}
+	}
+	for k, v := range c.neg {
+		if now.After(v.until) {
+			delete(c.neg, k)
+		}
+	}
+	c.mu.Unlock()
+}
