@@ -1,0 +1,15 @@
+services:
+  fluxtube:
+    image: ghcr.io/jodacame/fluxtube:latest   # or build: .
+    container_name: fluxtube
+    ports:
+      - "7002:7002"            # API + UI + /app + stream
+    volumes:
+      - ./config:/config       # settings, rules, cookies (no persistent media)
+      - ./cache:/cache         # bounded ephemeral segment cache
+    environment:
+      - FT_LISTEN_HOST=0.0.0.0
+      - FT_LISTEN_PORT=7002
+      # - FT_API_TOKEN=        # optional bearer token for /api/*
+      # - FT_COOKIES=/config/cookies.txt   # optional YouTube cookies
+    restart: unless-stopped

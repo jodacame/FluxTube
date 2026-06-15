@@ -1,0 +1,28 @@
+# Build output
+/fluxtube
+/dist
+web/dist/*
+!web/dist/.gitkeep
+
+# Node
+node_modules/
+*.log
+
+# Runtime data
+/config
+/cache
+config/
+cache/
+*.db
+
+# Secrets / local
+cookies.txt
+*.cookies
+.env
+.env.*
+
+# Tooling / editor
+.claude/
+.DS_Store
+.idea/
+.vscode/
