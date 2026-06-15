@@ -24,6 +24,12 @@ export function Watch() {
       .catch((e) => setErr(e.message))
       .finally(() => setLoading(false));
     api.related(id).then((p) => setRelated(p.videos || [])).catch(() => {});
+
+    // Stop the session when leaving this video so it doesn't linger as
+    // "streaming" and its cache is released promptly.
+    return () => {
+      api.stop(id).catch(() => {});
+    };
   }, [id]);
 
   return (
@@ -52,9 +58,7 @@ export function Watch() {
               {info.audio.length > 0 && <Badge>{info.audio.length} audio</Badge>}
               {info.subs.length > 0 && <Badge>{info.subs.length} subtitles</Badge>}
             </div>
-            {info.description && (
-              <p className="whitespace-pre-wrap rounded-md bg-card p-3 text-sm text-muted-foreground line-clamp-6">{info.description}</p>
-            )}
+            {info.description && <Description text={info.description} />}
           </div>
         )}
       </div>
@@ -80,4 +84,21 @@ export function Watch() {
 
 function Badge({ children }: { children: React.ReactNode }) {
   return <span className="rounded-full bg-accent px-2 py-0.5 font-medium text-accent-foreground">{children}</span>;
+}
+
+// Description shows the full text, collapsed by default with a toggle so long
+// descriptions don't get cut off permanently.
+function Description({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const long = text.length > 280;
+  return (
+    <div className="rounded-md bg-card p-3 text-sm text-muted-foreground">
+      <p className={`whitespace-pre-wrap break-words ${open || !long ? "" : "line-clamp-4"}`}>{text}</p>
+      {long && (
+        <button onClick={() => setOpen((v) => !v)} className="mt-2 text-xs font-medium text-primary hover:underline">
+          {open ? "Show less" : "Show more"}
+        </button>
+      )}
+    </div>
+  );
 }

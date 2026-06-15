@@ -22,3 +22,11 @@ export function fmtViews(n: number): string {
 export function shortName(s: string, max = 60): string {
   return s.length > max ? s.slice(0, max - 1) + "…" : s;
 }
+
+// extractId returns the 11-char YouTube id from a bare id or a YouTube URL.
+export function extractId(input: string): string | null {
+  const s = input.trim();
+  if (/^[A-Za-z0-9_-]{11}$/.test(s)) return s;
+  const m = s.match(/(?:v=|youtu\.be\/|\/shorts\/|\/embed\/|\/v\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : null;
+}

@@ -1,117 +1,145 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Play, Square, Trash2, Link2 } from "lucide-react";
-import { api, type VideoDTO } from "@/api";
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import { Play, Square, Trash2 } from "lucide-react";
+import { api, type VideoDTO, type Resolved } from "@/api";
 import { fmtDuration } from "@/util";
-import { Button, Input, Spinner } from "@/components/ui";
+import { Button, Spinner } from "@/components/ui";
 
 export function LibraryView() {
   const [videos, setVideos] = useState<VideoDTO[]>([]);
-  const [link, setLink] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [err, setErr] = useState("");
+  const [selected, setSelected] = useState<string | null>(null);
 
   const refresh = () => api.list().then(setVideos).catch(() => {});
 
   useEffect(() => {
     refresh();
-    const ws = openEvents(refresh);
-    return ws;
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    const ws = new WebSocket(`${proto}://${location.host}/api/events`);
+    ws.onmessage = () => refresh();
+    return () => ws.close();
   }, []);
 
-  const add = async () => {
-    const v = link.trim();
-    if (!v || adding) return;
-    setAdding(true);
-    setErr("");
-    try {
-      await api.add(v);
-      setLink("");
-      refresh();
-    } catch (e) {
-      setErr((e as Error).message);
-    } finally {
-      setAdding(false);
-    }
-  };
+  return (
+    <PanelGroup direction="vertical" autoSaveId="ft-lib" className="h-full">
+      <Panel defaultSize={64} minSize={25}>
+        <div className="h-full overflow-auto">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 border-b border-border bg-card text-left text-xs uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">Title</th>
+                <th className="px-3 py-2 font-medium">Channel</th>
+                <th className="px-3 py-2 font-medium">State</th>
+                <th className="px-3 py-2 text-right font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {videos.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-3 py-12 text-center text-muted-foreground">
+                    No videos yet. Paste a YouTube link in the toolbar above.
+                  </td>
+                </tr>
+              )}
+              {videos.map((v) => (
+                <tr
+                  key={v.id}
+                  onClick={() => setSelected(v.id)}
+                  className={`cursor-pointer border-b border-border last:border-0 ${selected === v.id ? "bg-primary/10" : "hover:bg-accent/40"}`}
+                >
+                  <td className="max-w-md px-3 py-2">
+                    <span className="line-clamp-1 font-medium">{v.title || v.id}</span>
+                    {v.duration > 0 && <span className="ml-2 text-xs tabular text-muted-foreground">{fmtDuration(v.duration)}</span>}
+                  </td>
+                  <td className="px-3 py-2 text-muted-foreground">{v.channel}</td>
+                  <td className="px-3 py-2">
+                    <span className={v.active ? "text-primary" : "text-muted-foreground"}>{v.active ? "streaming" : "idle"}</span>
+                  </td>
+                  <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex justify-end gap-1">
+                      <Link to={`/app/watch/${v.id}`}>
+                        <Button variant="ghost" size="icon" title="Play">
+                          <Play className="size-4" />
+                        </Button>
+                      </Link>
+                      <Button variant="ghost" size="icon" title="Stop" onClick={() => api.stop(v.id).then(refresh)}>
+                        <Square className="size-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" title="Delete" onClick={() => api.remove(v.id).then(refresh)}>
+                        <Trash2 className="size-4 text-red-400" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+      <PanelResizeHandle className="flex h-px items-center justify-center bg-border transition-colors hover:bg-primary/40 data-[resize-handle-state=drag]:bg-primary/60" />
+      <Panel defaultSize={36} minSize={0} collapsible>
+        <DetailPanel id={selected} />
+      </Panel>
+    </PanelGroup>
+  );
+}
+
+function DetailPanel({ id }: { id: string | null }) {
+  const [info, setInfo] = useState<Resolved | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setInfo(null);
+    if (!id) return;
+    setLoading(true);
+    api.get(id).then(setInfo).catch(() => {}).finally(() => setLoading(false));
+  }, [id]);
+
+  if (!id) {
+    return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Select a video to inspect its tracks.</div>;
+  }
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center gap-2 text-muted-foreground">
+        <Spinner /> Resolving…
+      </div>
+    );
+  }
+  if (!info) {
+    return <div className="flex h-full items-center justify-center text-sm text-red-400">Could not resolve this video.</div>;
+  }
 
   return (
-    <div className="mx-auto max-w-screen-xl space-y-4 p-4">
-      <div className="flex gap-2">
-        <div className="relative max-w-md flex-1">
-          <Link2 className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={link}
-            onChange={(e) => setLink(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && add()}
-            placeholder="Paste a YouTube ID or URL…"
-            className="pl-8"
-          />
+    <div className="h-full space-y-4 overflow-auto p-4">
+      <div className="flex gap-3">
+        {info.thumbnail && <img src={info.thumbnail} alt="" className="aspect-video w-40 rounded object-cover" />}
+        <div className="min-w-0">
+          <h3 className="line-clamp-2 font-semibold">{info.title}</h3>
+          <p className="text-sm text-muted-foreground">{info.channel}</p>
+          <p className="mt-1 text-xs text-muted-foreground tabular">{fmtDuration(info.duration)}</p>
         </div>
-        <Button onClick={add} disabled={adding || !link.trim()}>
-          {adding ? <Spinner /> : <Plus className="size-4" />} Add
-        </Button>
       </div>
-      {err && <p className="text-sm text-red-400">{err}</p>}
-
-      <div className="overflow-hidden rounded-lg border border-border">
-        <table className="w-full text-sm">
-          <thead className="border-b border-border bg-card/50 text-left text-xs uppercase tracking-wider text-muted-foreground">
-            <tr>
-              <th className="px-3 py-2 font-medium">Title</th>
-              <th className="px-3 py-2 font-medium">Channel</th>
-              <th className="px-3 py-2 font-medium">State</th>
-              <th className="px-3 py-2 text-right font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {videos.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-3 py-10 text-center text-muted-foreground">
-                  No videos yet. Paste a YouTube link above.
-                </td>
-              </tr>
-            )}
-            {videos.map((v) => (
-              <tr key={v.id} className="border-b border-border last:border-0 hover:bg-accent/40">
-                <td className="max-w-md px-3 py-2">
-                  <Link to={`/app/watch/${v.id}`} className="line-clamp-1 font-medium hover:text-primary">
-                    {v.title || v.id}
-                  </Link>
-                  {v.duration > 0 && <span className="ml-2 text-xs text-muted-foreground tabular">{fmtDuration(v.duration)}</span>}
-                </td>
-                <td className="px-3 py-2 text-muted-foreground">{v.channel}</td>
-                <td className="px-3 py-2">
-                  <span className={v.active ? "text-primary" : "text-muted-foreground"}>{v.active ? "streaming" : "idle"}</span>
-                </td>
-                <td className="px-3 py-2">
-                  <div className="flex justify-end gap-1">
-                    <Link to={`/app/watch/${v.id}`}>
-                      <Button variant="ghost" size="icon" title="Play">
-                        <Play className="size-4" />
-                      </Button>
-                    </Link>
-                    <Button variant="ghost" size="icon" title="Stop" onClick={() => api.stop(v.id).then(refresh)}>
-                      <Square className="size-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" title="Delete" onClick={() => api.remove(v.id).then(refresh)}>
-                      <Trash2 className="size-4 text-red-400" />
-                    </Button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <TrackList title={`Video (${info.video.length})`} items={info.video.map((v) => `${v.label} · ${v.codec}${v.hdr ? " HDR" : ""}`)} />
+        <TrackList title={`Audio (${info.audio.length})`} items={info.audio.map((a) => `${a.name} · ${a.codec} ${a.bitrate}k`)} />
+        <TrackList title={`Subtitles (${info.subs.length})`} items={info.subs.map((s) => `${s.name}${s.auto ? " (auto)" : ""}`)} />
       </div>
     </div>
   );
 }
 
-// openEvents subscribes to the live WebSocket and refreshes on any event.
-function openEvents(onEvent: () => void): () => void {
-  const proto = location.protocol === "https:" ? "wss" : "ws";
-  const ws = new WebSocket(`${proto}://${location.host}/api/events`);
-  ws.onmessage = () => onEvent();
-  return () => ws.close();
+function TrackList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div>
+      <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h4>
+      <ul className="space-y-1 text-sm">
+        {items.length === 0 && <li className="text-muted-foreground">—</li>}
+        {items.map((it, i) => (
+          <li key={i} className="truncate rounded bg-card px-2 py-1">
+            {it}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
