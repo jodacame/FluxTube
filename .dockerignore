@@ -1,0 +1,10 @@
+.git
+.github
+.claude
+web/node_modules
+web/dist
+*.md
+config
+cache
+*.db
+cookies.txt
