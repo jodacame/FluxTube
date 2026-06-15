@@ -12,36 +12,64 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
 
 	fluxtube "github.com/jodacame/fluxtube"
+	"github.com/jodacame/fluxtube/internal/api"
+	"github.com/jodacame/fluxtube/internal/config"
+	"github.com/jodacame/fluxtube/internal/extractor"
+	"github.com/jodacame/fluxtube/internal/stream"
 )
 
-// Version is the running build version, overridable at link time.
-var Version = "dev"
-
 func main() {
-	host := getenv("FT_LISTEN_HOST", "0.0.0.0")
-	port := getenv("FT_LISTEN_PORT", "7002")
+	configDir := getenv("FT_CONFIG_DIR", "/config")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		log.Fatalf("config dir: %v", err)
+	}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"version":%q,"status":"ok"}`, Version)
+	store, err := config.Open(filepath.Join(configDir, "fluxtube.db"))
+	if err != nil {
+		log.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	cfg := applyEnv(store)
+
+	ex := extractor.New(extractor.Options{
+		YtDlpPath:    getenv("FT_YTDLP", "yt-dlp"),
+		CookiesFile:  cfg.YouTube.CookiesFile,
+		ExtractorArg: cfg.YouTube.ExtractorArg,
+		AutoSubLangs: cfg.Quality.AutoSubLangs,
 	})
-	mux.Handle("/", spaHandler(fluxtube.DistFS()))
 
-	addr := net.JoinHostPort(host, port)
+	eng, err := stream.New(ex, stream.Options{
+		FFmpegPath:       getenv("FT_FFMPEG", "ffmpeg"),
+		CacheRoot:        cfg.Cache.Path,
+		SegmentSeconds:   cfg.Cache.SegmentSeconds,
+		IdleTimeout:      time.Duration(cfg.Limits.IdleTimeoutSec) * time.Second,
+		MaxSessions:      cfg.Limits.MaxSessions,
+		MaxFFmpeg:        cfg.Limits.MaxFFmpeg,
+		DefaultMaxHeight: cfg.Quality.DefaultMaxHeight,
+	})
+	if err != nil {
+		log.Fatalf("engine: %v", err)
+	}
+	defer eng.Close()
+
+	srv := api.New(store, ex, eng, fluxtube.DistFS())
+
+	addr := net.JoinHostPort(cfg.Net.ListenHost, strconv.Itoa(cfg.Net.ListenPort))
 	httpSrv := &http.Server{
 		Addr:              addr,
-		Handler:           mux,
+		Handler:           srv.Handler(),
 		ReadHeaderTimeout: 15 * time.Second,
 	}
 
 	go func() {
-		log.Printf("FluxTube %s listening on http://%s", Version, addr)
+		log.Printf("FluxTube %s listening on http://%s", api.Version, addr)
 		if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("http: %v", err)
 		}
@@ -59,15 +87,42 @@ func main() {
 	log.Println("bye")
 }
 
+// applyEnv overlays environment variables onto persisted settings (env wins for
+// the few boot-critical values) and returns the effective configuration.
+func applyEnv(store *config.Store) config.Settings {
+	cfg := store.Get()
+	changed := false
+	if v := os.Getenv("FT_LISTEN_HOST"); v != "" {
+		cfg.Net.ListenHost = v
+		changed = true
+	}
+	if v := os.Getenv("FT_LISTEN_PORT"); v != "" {
+		if p, err := strconv.Atoi(v); err == nil {
+			cfg.Net.ListenPort = p
+			changed = true
+		}
+	}
+	if v := os.Getenv("FT_CACHE_PATH"); v != "" {
+		cfg.Cache.Path = v
+		changed = true
+	}
+	if v := os.Getenv("FT_API_TOKEN"); v != "" {
+		cfg.APIToken = v
+		changed = true
+	}
+	if v := os.Getenv("FT_COOKIES"); v != "" {
+		cfg.YouTube.CookiesFile = v
+		changed = true
+	}
+	if changed {
+		_ = store.PutSettings(cfg)
+	}
+	return cfg
+}
+
 func getenv(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
 	}
 	return def
-}
-
-// portInt is a small helper kept for future numeric port needs.
-func portInt(s string) int {
-	n, _ := strconv.Atoi(s)
-	return n
 }

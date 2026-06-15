@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"io/fs"
@@ -7,13 +7,12 @@ import (
 	"strings"
 )
 
-// spaHandler serves the embedded single-page app, falling back to index.html
-// for client-side routes. When the UI has not been built yet (empty dist) it
-// returns a small placeholder so the binary still runs.
-func spaHandler(ui fs.FS) http.Handler {
-	fileServer := http.FileServer(http.FS(ui))
+// spaHandler serves the embedded SPA, falling back to index.html for client
+// routes (e.g. /app/...). When the UI is not built it returns a placeholder.
+func (s *Server) spaHandler() http.Handler {
+	fileServer := http.FileServer(http.FS(s.ui))
 	hasIndex := func() bool {
-		_, err := fs.Stat(ui, "index.html")
+		_, err := fs.Stat(s.ui, "index.html")
 		return err == nil
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -26,10 +25,10 @@ func spaHandler(ui fs.FS) http.Handler {
 		if p == "" {
 			p = "index.html"
 		}
-		if _, err := fs.Stat(ui, p); err != nil {
+		if _, err := fs.Stat(s.ui, p); err != nil {
 			r2 := r.Clone(r.Context())
 			r2.URL.Path = "/"
-			http.ServeFileFS(w, r2, ui, "index.html")
+			http.ServeFileFS(w, r2, s.ui, "index.html")
 			return
 		}
 		fileServer.ServeHTTP(w, r)
