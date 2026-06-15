@@ -44,7 +44,7 @@ export function Watch() {
             {err}
           </div>
         ) : (
-          <Player src={api.masterUrl(id)} poster={info?.thumbnail} />
+          <Player id={id} subs={info?.subs ?? []} poster={info?.thumbnail} />
         )}
 
         {info && (
