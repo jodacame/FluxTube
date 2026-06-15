@@ -20,6 +20,7 @@ import (
 	fluxtube "github.com/jodacame/fluxtube"
 	"github.com/jodacame/fluxtube/internal/api"
 	"github.com/jodacame/fluxtube/internal/config"
+	"github.com/jodacame/fluxtube/internal/discovery"
 	"github.com/jodacame/fluxtube/internal/extractor"
 	"github.com/jodacame/fluxtube/internal/stream"
 )
@@ -59,7 +60,10 @@ func main() {
 	}
 	defer eng.Close()
 
-	srv := api.New(store, ex, eng, fluxtube.DistFS())
+	provider := discovery.NewYtDlpProvider(getenv("FT_YTDLP", "yt-dlp"), cfg.YouTube.CookiesFile, cfg.YouTube.ExtractorArg)
+	disc := discovery.NewService(provider, time.Duration(cfg.Discovery.CacheSeconds)*time.Second)
+
+	srv := api.New(store, ex, eng, disc, fluxtube.DistFS())
 
 	addr := net.JoinHostPort(cfg.Net.ListenHost, strconv.Itoa(cfg.Net.ListenPort))
 	httpSrv := &http.Server{

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jodacame/fluxtube/internal/config"
+	"github.com/jodacame/fluxtube/internal/discovery"
 	"github.com/jodacame/fluxtube/internal/extractor"
 	"github.com/jodacame/fluxtube/internal/stream"
 )
@@ -19,23 +20,25 @@ var Version = "dev"
 
 // Server wires the store, extractor, streaming engine and UI into a handler.
 type Server struct {
-	store *config.Store
-	ex    *extractor.Extractor
-	eng   *stream.Engine
-	ui    fs.FS
-	hub   *hub
-	start time.Time
+	store     *config.Store
+	ex        *extractor.Extractor
+	eng       *stream.Engine
+	discovery *discovery.Service
+	ui        fs.FS
+	hub       *hub
+	start     time.Time
 }
 
 // New builds the API server.
-func New(store *config.Store, ex *extractor.Extractor, eng *stream.Engine, ui fs.FS) *Server {
+func New(store *config.Store, ex *extractor.Extractor, eng *stream.Engine, disc *discovery.Service, ui fs.FS) *Server {
 	s := &Server{
-		store: store,
-		ex:    ex,
-		eng:   eng,
-		ui:    ui,
-		hub:   newHub(),
-		start: time.Now(),
+		store:     store,
+		ex:        ex,
+		eng:       eng,
+		discovery: disc,
+		ui:        ui,
+		hub:       newHub(),
+		start:     time.Now(),
 	}
 	go s.hub.run()
 	go s.broadcastLoop()
