@@ -82,6 +82,8 @@ type Engine struct {
 
 	audioMu sync.Mutex // serialises music (audio-only) preparation
 
+	dirMu sync.RWMutex // guards the music directory path (independent of audioMu)
+
 	accessMu    sync.Mutex
 	audioAccess map[string]time.Time // last time each music track was served
 

@@ -122,7 +122,12 @@ func (e *Engine) Progressive(ctx context.Context, w http.ResponseWriter, r *http
 		http.Error(w, "no progressive format", http.StatusNotFound)
 		return nil
 	}
-	return proxyProgressive(ctx, w, r, e.opt.UserAgent, s.res.Progressive[0].URL)
+	pf := s.res.Progressive[0]
+	ua := pf.UA
+	if ua == "" {
+		ua = e.opt.UserAgent
+	}
+	return proxyProgressive(ctx, w, r, ua, pf.URL)
 }
 
 // Resolved returns the resolved info for a video (cached), starting no session.

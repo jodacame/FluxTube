@@ -78,22 +78,23 @@ func (s *session) close() {
 	_ = os.RemoveAll(s.dir)
 }
 
-// sourceFor returns the source URL and whether it exists for a track name.
-func (s *session) sourceFor(track string) (string, bool) {
+// sourceFor returns the source URL, its bound User-Agent, and whether it exists
+// for a track name.
+func (s *session) sourceFor(track string) (url, ua string, ok bool) {
 	if track == "video" {
 		if s.video.URL != "" {
-			return s.video.URL, true
+			return s.video.URL, s.video.UA, true
 		}
-		return "", false
+		return "", "", false
 	}
-	if lang, ok := strings.CutPrefix(track, "a-"); ok {
+	if lang, found := strings.CutPrefix(track, "a-"); found {
 		for _, a := range s.res.Audio {
 			if audioTrackName(a) == lang {
-				return a.URL, true
+				return a.URL, a.UA, true
 			}
 		}
 	}
-	return "", false
+	return "", "", false
 }
 
 // segAhead is how many segments past the production front a request may be
@@ -107,6 +108,7 @@ const segAhead = 10
 type rendition struct {
 	dir     string
 	src     string
+	ua      string
 	mu      sync.Mutex
 	cancel  context.CancelFunc
 	baseSeg int
@@ -115,14 +117,14 @@ type rendition struct {
 
 // ensureRendition returns (creating if needed) the rendition for a track.
 func (s *session) ensureRendition(track string) (*rendition, error) {
-	src, ok := s.sourceFor(track)
+	src, ua, ok := s.sourceFor(track)
 	if !ok {
 		return nil, os.ErrNotExist
 	}
 	s.mu.Lock()
 	r := s.renditions[track]
 	if r == nil {
-		r = &rendition{dir: filepath.Join(s.dir, track), src: src}
+		r = &rendition{dir: filepath.Join(s.dir, track), src: src, ua: ua}
 		s.renditions[track] = r
 		_ = os.MkdirAll(r.dir, 0o755)
 	}
@@ -191,9 +193,13 @@ func (s *session) runFFmpeg(r *rendition, base int, ctx context.Context) {
 	defer func() { <-s.e.sem }()
 
 	seg := s.e.opt.SegmentSeconds
+	ua := r.ua
+	if ua == "" {
+		ua = s.e.opt.UserAgent
+	}
 	args := []string{
 		"-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-		"-user_agent", s.e.opt.UserAgent,
+		"-user_agent", ua,
 	}
 	if base > 0 {
 		args = append(args, "-ss", itoa(base*seg))

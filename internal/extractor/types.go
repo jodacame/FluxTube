@@ -33,6 +33,7 @@ type VideoFormat struct {
 	HDR      bool   `json:"hdr"`
 	HasAudio bool   `json:"hasAudio"` // true for progressive formats
 	URL      string `json:"-"`        // CDN URL, never exposed to clients
+	UA       string `json:"-"`        // User-Agent the URL is bound to
 	Label    string `json:"label"`    // e.g. "1080p60 HDR"
 }
 
@@ -46,6 +47,7 @@ type AudioTrack struct {
 	Bitrate int    `json:"bitrate"` // kbps
 	Default bool   `json:"default"`
 	URL     string `json:"-"`
+	UA      string `json:"-"` // User-Agent the URL is bound to
 }
 
 // SubTrack is a subtitle/caption track for one language.

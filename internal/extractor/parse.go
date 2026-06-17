@@ -24,22 +24,26 @@ type rawInfo struct {
 }
 
 type rawFormat struct {
-	FormatID     string  `json:"format_id"`
-	URL          string  `json:"url"`
-	Ext          string  `json:"ext"`
-	Protocol     string  `json:"protocol"`
-	VCodec       string  `json:"vcodec"`
-	ACodec       string  `json:"acodec"`
-	Width        int     `json:"width"`
-	Height       int     `json:"height"`
-	FPS          float64 `json:"fps"`
-	TBR          float64 `json:"tbr"`
-	ABR          float64 `json:"abr"`
-	VBR          float64 `json:"vbr"`
-	Language     string  `json:"language"`
-	FormatNote   string  `json:"format_note"`
-	DynamicRange string  `json:"dynamic_range"`
+	FormatID     string            `json:"format_id"`
+	URL          string            `json:"url"`
+	Ext          string            `json:"ext"`
+	Protocol     string            `json:"protocol"`
+	VCodec       string            `json:"vcodec"`
+	ACodec       string            `json:"acodec"`
+	Width        int               `json:"width"`
+	Height       int               `json:"height"`
+	FPS          float64           `json:"fps"`
+	TBR          float64           `json:"tbr"`
+	ABR          float64           `json:"abr"`
+	VBR          float64           `json:"vbr"`
+	Language     string            `json:"language"`
+	FormatNote   string            `json:"format_note"`
+	DynamicRange string            `json:"dynamic_range"`
+	HTTPHeaders  map[string]string `json:"http_headers"`
 }
+
+// ua returns the User-Agent a format's URL is bound to.
+func (f rawFormat) ua() string { return f.HTTPHeaders["User-Agent"] }
 
 type rawSubtitle struct {
 	Ext  string `json:"ext"`
@@ -76,7 +80,7 @@ func parseInfo(r *rawInfo, allowedAuto map[string]bool) *Resolved {
 			res.Progressive = append(res.Progressive, VideoFormat{
 				ID: f.FormatID, Width: f.Width, Height: f.Height,
 				FPS: int(f.FPS + 0.5), Codec: shortCodec(f.VCodec), Ext: f.Ext,
-				Bitrate: int(f.TBR + 0.5), HasAudio: true, URL: f.URL,
+				Bitrate: int(f.TBR + 0.5), HasAudio: true, URL: f.URL, UA: f.ua(),
 				Label: videoLabel(f),
 			})
 		case has(f.VCodec):
@@ -84,13 +88,13 @@ func parseInfo(r *rawInfo, allowedAuto map[string]bool) *Resolved {
 				ID: f.FormatID, Width: f.Width, Height: f.Height,
 				FPS: int(f.FPS + 0.5), Codec: shortCodec(f.VCodec), Ext: f.Ext,
 				Bitrate: bitrate(f.VBR, f.TBR), HDR: isHDR(f.DynamicRange),
-				URL: f.URL, Label: videoLabel(f),
+				URL: f.URL, UA: f.ua(), Label: videoLabel(f),
 			})
 		case has(f.ACodec):
 			res.Audio = append(res.Audio, AudioTrack{
 				ID: f.FormatID, Lang: f.Language, Name: audioName(f),
 				Codec: shortCodec(f.ACodec), Ext: f.Ext,
-				Bitrate: bitrate(f.ABR, f.TBR), URL: f.URL,
+				Bitrate: bitrate(f.ABR, f.TBR), URL: f.URL, UA: f.ua(),
 			})
 		}
 	}

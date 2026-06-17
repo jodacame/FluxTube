@@ -22,7 +22,7 @@ func (e *Engine) Storage() Storage {
 	var s Storage
 	if entries, err := os.ReadDir(dir); err == nil {
 		for _, en := range entries {
-			if en.IsDir() || !(strings.HasSuffix(en.Name(), ".m4a") || strings.HasSuffix(en.Name(), ".opus")) {
+			if en.IsDir() || !strings.HasSuffix(en.Name(), ".m4a") {
 				continue
 			}
 			if info, err := en.Info(); err == nil {

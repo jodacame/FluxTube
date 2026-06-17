@@ -109,11 +109,10 @@ FluxTube can act as a lightweight music service backed by YouTube:
 
 - In the web client (`/app`), toggle **🎵 Music** next to the search box. Searches then
   hit the official **YouTube Music** catalog, so the top hit is the official track.
-- Playing a music result streams **audio only** at the **best available quality**:
-  the highest-bitrate track is **copied losslessly (no re-encoding)** into its
-  native container — AAC → `.m4a`, Opus → `.ogg` — and served with range support
-  so it plays and seeks in modern players (browser `<audio>`, VLC, mpv…):
-  `GET /stream/<id>/audio`.
+- Playing a music result streams **audio only** as **AAC in an `.m4a` container**:
+  the highest-bitrate AAC track is **copied losslessly**; if YouTube exposes no
+  AAC, the best audio is transcoded to AAC. Served with range support so it plays
+  and seeks in **any player** (browser `<audio>`, VLC, mpv…): `GET /stream/<id>/audio`.
 - The audio is written **once** to a persistent store and served directly afterwards,
   so a song is **never downloaded or processed twice**.
 - **Auto-save** (Settings → Music, on by default): videos detected as music — by the
