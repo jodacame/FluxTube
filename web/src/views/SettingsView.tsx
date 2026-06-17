@@ -73,6 +73,9 @@ export function SettingsView() {
             </span>
           </span>
         </label>
+        <Field label="Music storage path (persistent)">
+          <Input value={s.music.dir} onChange={(e) => setS({ ...s, music: { ...s.music, dir: e.target.value } })} placeholder="/config/music" />
+        </Field>
       </Card>
 
       <Card className="space-y-4 p-4">

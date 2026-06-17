@@ -57,9 +57,10 @@ func (s *Server) putRules(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, list)
 }
 
-// applySettings propagates relevant live settings to the extractor.
+// applySettings propagates relevant live settings to the extractor and engine.
 func (s *Server) applySettings(cfg config.Settings) {
 	s.ex.SetCookies(cfg.YouTube.CookiesFile)
+	s.eng.SetMusicDir(cfg.Music.Dir)
 }
 
 func maskToken(t string) string {

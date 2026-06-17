@@ -59,7 +59,7 @@ export interface Settings {
   youtube: { cookiesFile: string; extractorArg: string };
   discovery: { provider: string; invidiousBaseUrl: string; cacheSeconds: number };
   limits: { maxSessions: number; maxFFmpeg: number; idleTimeoutSec: number };
-  music: { autoSave: boolean };
+  music: { autoSave: boolean; dir: string };
   apiToken: string;
 }
 
@@ -88,6 +88,14 @@ export interface DiscoverPage {
   channels?: { id: string; name: string; thumbnail: string; subscribers: number }[];
   nextPage?: string;
 }
+export interface Storage {
+  musicBytes: number;
+  musicCount: number;
+  cacheBytes: number;
+  freeBytes: number;
+  totalBytes: number;
+}
+
 export interface ChannelInfo {
   id: string;
   name: string;
@@ -112,6 +120,7 @@ async function j<T>(res: Response): Promise<T> {
 
 export const api = {
   health: () => fetch("/api/health").then((r) => j<{ version: string; activeSessions: number }>(r)),
+  storage: () => fetch("/api/storage").then((r) => j<Storage>(r)),
 
   // library
   list: () => fetch("/api/videos").then((r) => j<VideoDTO[]>(r)),

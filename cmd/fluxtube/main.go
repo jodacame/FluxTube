@@ -55,7 +55,7 @@ func main() {
 		MaxFFmpeg:        cfg.Limits.MaxFFmpeg,
 		DefaultMaxHeight: cfg.Quality.DefaultMaxHeight,
 		MaxSizeMB:        cfg.Cache.MaxSizeMB,
-		MusicDir:         filepath.Join(configDir, "music"),
+		MusicDir:         musicDir(cfg, configDir),
 	})
 	if err != nil {
 		log.Fatalf("engine: %v", err)
@@ -120,10 +120,23 @@ func applyEnv(store *config.Store) config.Settings {
 		cfg.YouTube.CookiesFile = v
 		changed = true
 	}
+	if v := os.Getenv("FT_MUSIC_DIR"); v != "" {
+		cfg.Music.Dir = v
+		changed = true
+	}
 	if changed {
 		_ = store.PutSettings(cfg)
 	}
 	return cfg
+}
+
+// musicDir resolves the persistent music directory from settings, defaulting to
+// a folder under the config dir.
+func musicDir(cfg config.Settings, configDir string) string {
+	if cfg.Music.Dir != "" {
+		return cfg.Music.Dir
+	}
+	return filepath.Join(configDir, "music")
 }
 
 func getenv(key, def string) string {

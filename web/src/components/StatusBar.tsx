@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Activity, Heart } from "lucide-react";
-import { api } from "@/api";
+import { Activity, Heart, HardDrive, Music } from "lucide-react";
+import { api, type Storage } from "@/api";
+import { fmtSize } from "@/util";
 
 const REPO = "https://github.com/jodacame/fluxtube";
 const SPONSOR = "https://github.com/sponsors/jodacame";
@@ -16,12 +17,16 @@ function GitHubMark({ className }: { className?: string }) {
 export function StatusBar() {
   const [version, setVersion] = useState("");
   const [active, setActive] = useState(0);
+  const [storage, setStorage] = useState<Storage | null>(null);
 
   useEffect(() => {
-    const pull = () => api.health().then((h) => {
-      setVersion(h.version);
-      setActive(h.activeSessions);
-    }).catch(() => {});
+    const pull = () => {
+      api.health().then((h) => {
+        setVersion(h.version);
+        setActive(h.activeSessions);
+      }).catch(() => {});
+      api.storage().then(setStorage).catch(() => {});
+    };
     pull();
     const id = setInterval(pull, 5000);
     return () => clearInterval(id);
@@ -40,9 +45,24 @@ export function StatusBar() {
       <a href={SPONSOR} target="_blank" rel="noreferrer" className="hidden items-center gap-1 text-pink-400 transition-opacity hover:opacity-80 sm:flex" title="Sponsor">
         <Heart className="size-3 fill-current" /> Sponsor
       </a>
-      <span className="ml-auto flex select-none items-center gap-1 text-muted-foreground/70">
-        Flux<b className="text-primary">Tube</b>
-      </span>
+
+      {storage && (
+        <span className="ml-auto flex items-center gap-1.5 tabular" title={`${storage.musicCount} songs stored`}>
+          <Music className="size-3 text-primary" />
+          {fmtSize(storage.musicBytes)}
+          <span className="text-muted-foreground/60">({storage.musicCount})</span>
+        </span>
+      )}
+      {storage && storage.totalBytes > 0 && (
+        <span
+          className={`flex items-center gap-1.5 tabular ${storage ? "" : "ml-auto"}`}
+          title={`Disk: ${fmtSize(storage.freeBytes)} free of ${fmtSize(storage.totalBytes)}`}
+        >
+          <HardDrive className="size-3" />
+          {fmtSize(storage.freeBytes)}
+          <span className="hidden text-muted-foreground/60 sm:inline">/ {fmtSize(storage.totalBytes)}</span>
+        </span>
+      )}
     </div>
   );
 }

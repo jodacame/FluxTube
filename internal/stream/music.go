@@ -83,3 +83,21 @@ func (e *Engine) ServeAudio(ctx context.Context, w http.ResponseWriter, r *http.
 func (e *Engine) HasAudioFile(id string) bool {
 	return fileExists(filepath.Join(e.opt.MusicDir, id+".m4a"))
 }
+
+// SetMusicDir updates the persistent music directory at runtime.
+func (e *Engine) SetMusicDir(dir string) {
+	if dir == "" {
+		return
+	}
+	e.audioMu.Lock()
+	e.opt.MusicDir = dir
+	e.audioMu.Unlock()
+	_ = os.MkdirAll(dir, 0o755)
+}
+
+// MusicDir returns the current persistent music directory.
+func (e *Engine) MusicDir() string {
+	e.audioMu.Lock()
+	defer e.audioMu.Unlock()
+	return e.opt.MusicDir
+}
