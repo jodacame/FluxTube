@@ -51,7 +51,8 @@ always-on box).
 - 🪶 **Efficient by design** — `-c copy` (no transcode), bounded ephemeral cache, idle sessions are torn down. Minimal upstream requests via aggressive caching and single-flight.
 - 🔎 **Headless discovery API** — keyless search, trending, channels, playlists, related and a stateless recommended feed (client owns its history/follows).
 - 🖥️ **Two web UIs in one** — a management dashboard (`/`) and a YouTube-like web client (`/app`) with an `hls.js` player and track selectors.
-- 🧭 **Per-source rules** — match by channel / title / id → reject, cap quality, prefer audio/subtitle language, or force cache/ephemeral.
+- 🧭 **Per-source rules** — match by channel / title / id → reject, cap quality, prefer audio/subtitle language, force cache/ephemeral, or mark as music.
+- 🎵 **Music mode** — search the official **YouTube Music** catalog and play **audio-only** in a universal AAC/`m4a` format; songs are stored once (persistent, optimal — no re-download) and can be auto-detected and auto-saved.
 - 🍪 **Optional cookies** — point to a cookies file to unlock restricted videos.
 - 🪶 **Single binary, single container** — UI embedded via `go:embed`.
 
@@ -102,6 +103,26 @@ services:
 > image build). Without them, only a basic progressive format may be available. For
 > region- or sign-in-restricted videos, configure an optional cookies file.
 
+## Music mode
+
+FluxTube can act as a lightweight music service backed by YouTube:
+
+- In the web client (`/app`), toggle **🎵 Music** next to the search box. Searches then
+  hit the official **YouTube Music** catalog, so the top hit is the official track.
+- Playing a music result streams **audio only** as **AAC in an `.m4a` container**
+  (`-c copy` when the source is already AAC, otherwise a light transcode) with a
+  front-loaded index, so it plays and seeks in **any player** — including a plain
+  browser `<audio>` element, VLC, etc.: `GET /stream/<id>/audio.m4a`.
+- The audio is written **once** to a persistent store and served directly afterwards,
+  so a song is **never downloaded or processed twice**.
+- **Auto-save** (Settings → Music, on by default): videos detected as music — by the
+  YouTube *Music* category or auto-generated `- Topic`/Vevo channels — are saved as
+  music automatically, no rule required. You can also mark sources as music with a
+  **rule** (`action: music`).
+- The persistent store path is configurable (Settings → Music, env `FT_MUSIC_DIR`,
+  default `/config/music`). The status bar shows how much space the saved music uses
+  and the free disk space.
+
 ## Configuration
 
 Everything is editable in **Settings** and persisted to `/config`. A few values can
@@ -115,6 +136,7 @@ be seeded from environment variables:
 | `FT_CACHE_PATH` | `/cache` | Ephemeral segment cache root |
 | `FT_API_TOKEN` | _(empty)_ | Optional bearer token for `/api/*` |
 | `FT_COOKIES` | _(empty)_ | Optional cookies file to unlock restricted videos |
+| `FT_MUSIC_DIR` | `/config/music` | Persistent store for saved music (audio) |
 
 From the UI you can also tune default quality, preferred audio/subtitle languages,
 auto-caption languages, segment length, idle timeout, concurrency limits and rules.
@@ -132,6 +154,8 @@ POST   /api/videos/:id/stop     → stop the live session
 DELETE /api/videos/:id          → remove + stop + clear cache
 GET    /stream/:id/master.m3u8  → HLS master (?q=1080 to cap quality)   ← players
 GET    /stream/:id/progressive  → progressive fallback
+GET    /stream/:id/audio.m4a    → audio-only (AAC), persistent           ← music
+GET    /api/discover/search?q=&music=1  → official YouTube Music results
 GET/PUT /api/settings
 GET/PUT /api/rules
 WS     /api/events              → live state
