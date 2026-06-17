@@ -62,9 +62,10 @@ export function Watch() {
               <SaveButton id={id} music={audio} />
             </div>
             <div className="flex flex-wrap gap-2 pt-1 text-xs text-muted-foreground">
-              {info.video[0] && <Badge>{info.video[0].label}</Badge>}
-              {info.audio.length > 0 && <Badge>{info.audio.length} audio</Badge>}
-              {info.subs.length > 0 && <Badge>{info.subs.length} subtitles</Badge>}
+              {audio && <Badge>Audio</Badge>}
+              {info.video?.[0] && <Badge>{info.video[0].label}</Badge>}
+              {(info.audio?.length ?? 0) > 0 && <Badge>{info.audio.length} audio</Badge>}
+              {(info.subs?.length ?? 0) > 0 && <Badge>{info.subs.length} subtitles</Badge>}
             </div>
             {info.description && <Description text={info.description} />}
           </div>

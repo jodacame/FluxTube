@@ -98,6 +98,20 @@ func parseInfo(r *rawInfo, allowedAuto map[string]bool) *Resolved {
 	dedupeAudioByLang(res)
 	res.Subs = collectSubs(r, allowedAuto)
 
+	// Always expose empty slices (never null) so clients can read .length safely.
+	if res.Video == nil {
+		res.Video = []VideoFormat{}
+	}
+	if res.Audio == nil {
+		res.Audio = []AudioTrack{}
+	}
+	if res.Progressive == nil {
+		res.Progressive = []VideoFormat{}
+	}
+	if res.Subs == nil {
+		res.Subs = []SubTrack{}
+	}
+
 	// Highest quality first.
 	sort.SliceStable(res.Video, func(i, j int) bool { return res.Video[i].Height > res.Video[j].Height })
 	sort.SliceStable(res.Progressive, func(i, j int) bool { return res.Progressive[i].Height > res.Progressive[j].Height })
