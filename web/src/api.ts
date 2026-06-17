@@ -156,5 +156,5 @@ export const api = {
   masterUrl: (id: string, q?: number) => `${location.origin}/stream/${id}/master.m3u8${q ? `?q=${q}` : ""}`,
   progressiveUrl: (id: string) => `${location.origin}/stream/${id}/progressive`,
   subUrl: (id: string, lang: string) => `${location.origin}/stream/${id}/sub/${encodeURIComponent(lang)}.vtt`,
-  audioUrl: (id: string) => `${location.origin}/stream/${id}/audio.m4a`,
+  audioUrl: (id: string) => `${location.origin}/stream/${id}/audio`,
 };

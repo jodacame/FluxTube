@@ -109,10 +109,11 @@ FluxTube can act as a lightweight music service backed by YouTube:
 
 - In the web client (`/app`), toggle **🎵 Music** next to the search box. Searches then
   hit the official **YouTube Music** catalog, so the top hit is the official track.
-- Playing a music result streams **audio only** as **AAC in an `.m4a` container**
-  (`-c copy` when the source is already AAC, otherwise a light transcode) with a
-  front-loaded index, so it plays and seeks in **any player** — including a plain
-  browser `<audio>` element, VLC, etc.: `GET /stream/<id>/audio.m4a`.
+- Playing a music result streams **audio only** at the **best available quality**:
+  the highest-bitrate track is **copied losslessly (no re-encoding)** into its
+  native container — AAC → `.m4a`, Opus → `.ogg` — and served with range support
+  so it plays and seeks in modern players (browser `<audio>`, VLC, mpv…):
+  `GET /stream/<id>/audio`.
 - The audio is written **once** to a persistent store and served directly afterwards,
   so a song is **never downloaded or processed twice**.
 - **Auto-save** (Settings → Music, on by default): videos detected as music — by the
@@ -154,7 +155,7 @@ POST   /api/videos/:id/stop     → stop the live session
 DELETE /api/videos/:id          → remove + stop + clear cache
 GET    /stream/:id/master.m3u8  → HLS master (?q=1080 to cap quality)   ← players
 GET    /stream/:id/progressive  → progressive fallback
-GET    /stream/:id/audio.m4a    → audio-only (AAC), persistent           ← music
+GET    /stream/:id/audio        → audio-only, best quality, persistent   ← music
 GET    /api/discover/search?q=&music=1  → official YouTube Music results
 GET/PUT /api/settings
 GET/PUT /api/rules
