@@ -27,12 +27,8 @@ export function Watch() {
       .catch((e) => setErr(e.message))
       .finally(() => setLoading(false));
     api.related(id).then((p) => setRelated(p.videos || [])).catch(() => {});
-
-    // Stop the session when leaving this video so it doesn't linger as
-    // "streaming" and its cache is released promptly.
-    return () => {
-      api.stop(id).catch(() => {});
-    };
+    // We intentionally do NOT stop on unmount: the session should remain visible
+    // in the Streaming screen (with a Stop button) and self-clean on idle.
   }, [id]);
 
   return (
