@@ -1,14 +1,18 @@
 import { useEffect, useState } from "react";
-import { api, type Settings } from "@/api";
+import { HardDrive, Music } from "lucide-react";
+import { api, type Settings, type Storage } from "@/api";
+import { fmtSize } from "@/util";
 import { Button, Input, Card, Spinner } from "@/components/ui";
 
 export function SettingsView() {
   const [s, setS] = useState<Settings | null>(null);
+  const [storage, setStorage] = useState<Storage | null>(null);
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState("");
 
   useEffect(() => {
     api.getSettings().then(setS).catch((e) => setErr(e.message));
+    api.storage().then(setStorage).catch(() => {});
   }, []);
 
   if (!s) {
@@ -76,6 +80,36 @@ export function SettingsView() {
         <Field label="Music storage path (persistent)">
           <Input value={s.music.dir} onChange={(e) => setS({ ...s, music: { ...s.music, dir: e.target.value } })} placeholder="/config/music" />
         </Field>
+        {storage && (
+          <div className="space-y-2 rounded-md border border-border bg-background/40 p-3 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <Music className="size-4 text-primary" /> Music stored
+              </span>
+              <span className="tabular">
+                {fmtSize(storage.musicBytes)} · {storage.musicCount} {storage.musicCount === 1 ? "song" : "songs"}
+              </span>
+            </div>
+            {storage.totalBytes > 0 && (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <HardDrive className="size-4" /> Disk
+                  </span>
+                  <span className="tabular">
+                    {fmtSize(storage.freeBytes)} free of {fmtSize(storage.totalBytes)}
+                  </span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-border">
+                  <div
+                    className="h-full rounded-full bg-primary"
+                    style={{ width: `${Math.min(100, Math.round(((storage.totalBytes - storage.freeBytes) / storage.totalBytes) * 100))}%` }}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </Card>
 
       <Card className="space-y-4 p-4">
