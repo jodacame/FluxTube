@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"time"
+
+	"github.com/jodacame/fluxtube/internal/extractor"
 )
 
 // audioPath returns the stored audio file for an id, if present.
@@ -40,18 +42,34 @@ func (e *Engine) AudioFile(ctx context.Context, id string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 
-	res, err := e.ex.Resolve(ctx, id)
-	if err != nil {
-		return "", err
-	}
+	path := filepath.Join(e.MusicDir(), id+".m4a")
 
-	// Prefer the highest-bitrate AAC track (lossless copy); only if no AAC is
-	// available, transcode the best audio to AAC for universal compatibility.
+	// YouTube CDN URLs occasionally reject a request (transient 403/SABR). Retry
+	// once with a freshly resolved URL before giving up.
+	var lastErr error
+	for attempt := 0; attempt < 2; attempt++ {
+		res, err := e.ex.Resolve(ctx, id)
+		if err != nil {
+			return "", err
+		}
+		if err := e.writeAudio(ctx, res, path); err != nil {
+			lastErr = err
+			e.ex.Drop(id) // force a fresh resolve on the next attempt
+			continue
+		}
+		return path, nil
+	}
+	return "", lastErr
+}
+
+// writeAudio copies the best audio track of a resolved video into an m4a file,
+// preferring a lossless AAC copy and falling back to an AAC transcode.
+func (e *Engine) writeAudio(ctx context.Context, res *extractor.Resolved, path string) error {
 	src, copyCodec := res.BestAAC()
 	if !copyCodec {
 		best, ok := res.BestAudio()
 		if !ok {
-			return "", errors.New("no audio track available")
+			return errors.New("no audio track available")
 		}
 		src = best
 	}
@@ -60,9 +78,7 @@ func (e *Engine) AudioFile(ctx context.Context, id string) (string, error) {
 	if ua == "" {
 		ua = e.opt.UserAgent
 	}
-	path := filepath.Join(e.MusicDir(), id+".m4a")
 	tmp := path + ".tmp"
-
 	args := []string{"-nostdin", "-hide_banner", "-loglevel", "error", "-y",
 		"-user_agent", ua, "-i", src.URL, "-vn"}
 	if copyCodec {
@@ -72,15 +88,11 @@ func (e *Engine) AudioFile(ctx context.Context, id string) (string, error) {
 	}
 	args = append(args, "-movflags", "+faststart", "-f", "mp4", tmp)
 
-	cmd := exec.CommandContext(ctx, e.opt.FFmpegPath, args...)
-	if err := cmd.Run(); err != nil {
+	if err := exec.CommandContext(ctx, e.opt.FFmpegPath, args...).Run(); err != nil {
 		_ = os.Remove(tmp)
-		return "", errors.New("audio preparation failed")
+		return errors.New("audio preparation failed")
 	}
-	if err := os.Rename(tmp, path); err != nil {
-		return "", err
-	}
-	return path, nil
+	return os.Rename(tmp, path)
 }
 
 // ServeAudio serves the persistent best-quality audio file with range support.
