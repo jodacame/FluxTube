@@ -31,7 +31,8 @@ func (s *Server) discoverSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	page, err := s.disc().Search(r.Context(), q, r.URL.Query().Get("type"), limit)
+	music := r.URL.Query().Get("music") == "1" || r.URL.Query().Get("music") == "true"
+	page, err := s.disc().Search(r.Context(), q, r.URL.Query().Get("type"), limit, music)
 	respondPage(w, page, err)
 }
 

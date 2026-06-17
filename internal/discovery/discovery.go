@@ -41,7 +41,7 @@ type Page struct {
 
 // Provider is a catalog backend. Implementations must be keyless.
 type Provider interface {
-	Search(ctx context.Context, query, kind string, limit int) (Page, error)
+	Search(ctx context.Context, query, kind string, limit int, music bool) (Page, error)
 	Trending(ctx context.Context, region string) (Page, error)
 	Channel(ctx context.Context, channelID string) (ChannelItem, error)
 	ChannelVideos(ctx context.Context, channelID, tab string, page int) (Page, error)

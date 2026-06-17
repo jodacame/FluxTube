@@ -5,7 +5,7 @@ import { Button, Card, Input, Spinner } from "@/components/ui";
 
 const FIELDS: RuleField[] = ["channel", "title", "videoId"];
 const OPS: RuleOp[] = ["equals", "contains", "regex"];
-const ACTIONS: RuleAction[] = ["reject", "maxQuality", "preferAudioLang", "preferSubLang", "cache", "ephemeral"];
+const ACTIONS: RuleAction[] = ["reject", "maxQuality", "preferAudioLang", "preferSubLang", "cache", "ephemeral", "music"];
 
 export function RulesView() {
   const [rules, setRules] = useState<Rule[] | null>(null);

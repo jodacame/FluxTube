@@ -35,6 +35,7 @@ const (
 	ActionPreferSubLang   Action = "preferSubLang"
 	ActionCache           Action = "cache"
 	ActionEphemeral       Action = "ephemeral"
+	ActionMusic           Action = "music"
 )
 
 // Match describes the condition for a rule.
@@ -69,6 +70,7 @@ type Decision struct {
 	PreferSubLang   string // empty = none
 	ForceCache      bool
 	ForceEphemeral  bool
+	Music           bool // treat as music: audio-only + persistent
 }
 
 // Evaluate applies rules in order (first match per concern wins) and returns
@@ -105,6 +107,8 @@ func Evaluate(list []Rule, s Subject) Decision {
 			if !d.ForceCache {
 				d.ForceEphemeral = true
 			}
+		case ActionMusic:
+			d.Music = true
 		}
 	}
 	return d
@@ -155,7 +159,7 @@ func (r Rule) Valid() bool {
 		}
 	}
 	switch r.Action {
-	case ActionReject, ActionMaxQuality, ActionPreferAudioLang, ActionPreferSubLang, ActionCache, ActionEphemeral:
+	case ActionReject, ActionMaxQuality, ActionPreferAudioLang, ActionPreferSubLang, ActionCache, ActionEphemeral, ActionMusic:
 		return true
 	}
 	return false

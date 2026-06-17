@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -12,8 +13,9 @@ import (
 // videoDTO is a library entry plus computed live state.
 type videoDTO struct {
 	config.Entry
-	Active bool   `json:"active"`
-	State  string `json:"state"` // "idle" | "streaming"
+	Active     bool   `json:"active"`
+	State      string `json:"state"` // "idle" | "streaming"
+	AudioReady bool   `json:"audioReady"`
 }
 
 func (s *Server) toDTO(e config.Entry) videoDTO {
@@ -22,14 +24,15 @@ func (s *Server) toDTO(e config.Entry) videoDTO {
 	if active {
 		state = "streaming"
 	}
-	return videoDTO{Entry: e, Active: active, State: state}
+	return videoDTO{Entry: e, Active: active, State: state, AudioReady: s.eng.HasAudioFile(e.ID)}
 }
 
 // addVideo registers a video in the library using cheap oEmbed metadata.
 func (s *Server) addVideo(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		ID  string `json:"id"`
-		URL string `json:"url"`
+		ID    string `json:"id"`
+		URL   string `json:"url"`
+		Music bool   `json:"music"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, http.StatusBadRequest, "invalid body")
@@ -45,16 +48,24 @@ func (s *Server) addVideo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	entry := config.Entry{ID: id, AddedAt: time.Now().Unix()}
+	entry := config.Entry{ID: id, AddedAt: time.Now().Unix(), Kind: "video"}
 	if meta, err := s.ex.Meta(r.Context(), id); err == nil {
 		entry.Title = meta.Title
 		entry.Channel = meta.Channel
 		entry.ChannelID = meta.ChannelID
 		entry.Thumbnail = meta.Thumbnail
 	}
+	if body.Music {
+		entry.Kind = "music"
+	}
 	if err := s.store.AddEntry(entry); err != nil {
 		writeErr(w, http.StatusInternalServerError, "store error")
 		return
+	}
+	// Prepare the persistent audio file in the background so it is ready and
+	// never re-downloaded.
+	if entry.Kind == "music" {
+		go func() { _, _ = s.eng.AudioFile(context.Background(), id) }()
 	}
 	s.hub.broadcast(event{Type: "added", ID: id})
 	writeJSON(w, http.StatusOK, s.toDTO(entry))

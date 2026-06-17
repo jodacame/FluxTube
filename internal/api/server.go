@@ -75,6 +75,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /stream/{id}/subs/{file}", s.streamSubPlaylist)
 	mux.HandleFunc("GET /stream/{id}/sub/{file}", s.streamSubVTT)
 	mux.HandleFunc("GET /stream/{id}/progressive", s.streamProgressive)
+	mux.HandleFunc("GET /stream/{id}/audio.m4a", s.streamAudio)
 
 	// UI / web client (SPA fallback).
 	mux.Handle("/", s.spaHandler())

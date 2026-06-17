@@ -31,8 +31,9 @@ type Options struct {
 	MaxFFmpeg        int // concurrent ffmpeg processes cap
 	UserAgent        string
 	GCInterval       time.Duration
-	DefaultMaxHeight int // default video height cap (0 = best available)
-	MaxSizeMB        int // total on-disk cache cap (0 = unbounded)
+	DefaultMaxHeight int    // default video height cap (0 = best available)
+	MaxSizeMB        int    // total on-disk cache cap (0 = unbounded)
+	MusicDir         string // persistent store for music (audio-only) files
 }
 
 func (o *Options) withDefaults() {
@@ -65,6 +66,9 @@ func (o *Options) withDefaults() {
 		// hardware; clients can request higher via the master selection.
 		o.DefaultMaxHeight = 1080
 	}
+	if o.MusicDir == "" {
+		o.MusicDir = filepath.Join(o.CacheRoot, "..", "music")
+	}
 }
 
 // Engine manages streaming sessions.
@@ -76,6 +80,8 @@ type Engine struct {
 	mu       sync.Mutex
 	sessions map[string]*session
 
+	audioMu sync.Mutex // serialises music (audio-only) preparation
+
 	stopGC chan struct{}
 }
 
@@ -85,8 +91,10 @@ func New(ex *extractor.Extractor, opt Options) (*Engine, error) {
 	if err := os.MkdirAll(opt.CacheRoot, 0o755); err != nil {
 		return nil, fmt.Errorf("cache root: %w", err)
 	}
-	// Clean any stale cache from a previous run.
+	// Clean any stale segment cache from a previous run.
 	_ = clearDir(opt.CacheRoot)
+	// Music is persistent — only ensure the directory exists.
+	_ = os.MkdirAll(opt.MusicDir, 0o755)
 
 	e := &Engine{
 		ex:       ex,

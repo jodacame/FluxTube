@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os/exec"
+	"sort"
 	"strings"
 	"time"
 )
@@ -92,13 +93,39 @@ func (p *YtDlpProvider) run(ctx context.Context, target string, items string) (*
 	return &res, nil
 }
 
-func (p *YtDlpProvider) Search(ctx context.Context, query, kind string, limit int) (Page, error) {
+func (p *YtDlpProvider) Search(ctx context.Context, query, kind string, limit int, music bool) (Page, error) {
 	spec := fmt.Sprintf("ytsearch%d:%s", limit, query)
 	res, err := p.run(ctx, spec, "")
 	if err != nil {
 		return Page{}, err
 	}
-	return Page{Videos: toVideos(res.Entries)}, nil
+	videos := toVideos(res.Entries)
+	if music {
+		videos = rankMusic(videos)
+	}
+	return Page{Videos: videos}, nil
+}
+
+// rankMusic reorders results to surface official song audio/video first, the
+// way a music app would: artist topic channels and official uploads.
+func rankMusic(videos []VideoItem) []VideoItem {
+	score := func(v VideoItem) int {
+		s := 0
+		ch := strings.ToLower(v.Channel)
+		title := strings.ToLower(v.Title)
+		if strings.HasSuffix(ch, "- topic") || strings.Contains(ch, "vevo") {
+			s += 3
+		}
+		if strings.Contains(title, "official audio") {
+			s += 2
+		}
+		if strings.Contains(title, "official") || strings.Contains(title, "audio") {
+			s++
+		}
+		return s
+	}
+	sort.SliceStable(videos, func(i, j int) bool { return score(videos[i]) > score(videos[j]) })
+	return videos
 }
 
 func (p *YtDlpProvider) Trending(ctx context.Context, region string) (Page, error) {

@@ -7,13 +7,14 @@ import (
 	"strings"
 )
 
-// Search returns catalog results for a query.
-func (s *Service) Search(ctx context.Context, query, kind string, limit int) (Page, error) {
+// Search returns catalog results for a query. When music is true, results are
+// biased toward official song audio/video (artist "- Topic" channels, etc.).
+func (s *Service) Search(ctx context.Context, query, kind string, limit int, music bool) (Page, error) {
 	if limit <= 0 || limit > 50 {
 		limit = 20
 	}
-	key := fmt.Sprintf("search|%s|%s|%d", query, kind, limit)
-	v, err := s.do(key, func() (any, error) { return s.p.Search(ctx, query, kind, limit) })
+	key := fmt.Sprintf("search|%s|%s|%d|%t", query, kind, limit, music)
+	v, err := s.do(key, func() (any, error) { return s.p.Search(ctx, query, kind, limit, music) })
 	return asPage(v), err
 }
 

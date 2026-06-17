@@ -77,3 +77,10 @@ func (s *Server) streamProgressive(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadGateway, err.Error())
 	}
 }
+
+// streamAudio serves the persistent, universally-playable audio (music) file.
+func (s *Server) streamAudio(w http.ResponseWriter, r *http.Request) {
+	if err := s.eng.ServeAudio(r.Context(), w, r, r.PathValue("id")); err != nil {
+		writeErr(w, http.StatusBadGateway, err.Error())
+	}
+}

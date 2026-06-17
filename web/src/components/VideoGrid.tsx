@@ -2,22 +2,22 @@ import { Link } from "react-router-dom";
 import type { DiscoverVideo } from "@/api";
 import { fmtDuration, fmtViews, shortName } from "@/util";
 
-export function VideoGrid({ videos }: { videos: DiscoverVideo[] }) {
+export function VideoGrid({ videos, audio }: { videos: DiscoverVideo[]; audio?: boolean }) {
   if (videos.length === 0) {
     return <p className="py-10 text-center text-sm text-muted-foreground">Nothing to show.</p>;
   }
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {videos.map((v) => (
-        <VideoCard key={v.id} v={v} />
+        <VideoCard key={v.id} v={v} audio={audio} />
       ))}
     </div>
   );
 }
 
-function VideoCard({ v }: { v: DiscoverVideo }) {
+function VideoCard({ v, audio }: { v: DiscoverVideo; audio?: boolean }) {
   return (
-    <Link to={`/app/watch/${v.id}`} className="group block">
+    <Link to={`/app/watch/${v.id}${audio ? "?audio=1" : ""}`} className="group block">
       <div className="relative overflow-hidden rounded-lg border border-border bg-card">
         <img src={v.thumbnail} alt="" loading="lazy" className="aspect-video w-full object-cover transition-transform group-hover:scale-[1.03]" />
         {v.duration > 0 && (

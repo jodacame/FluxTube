@@ -55,6 +55,7 @@ func main() {
 		MaxFFmpeg:        cfg.Limits.MaxFFmpeg,
 		DefaultMaxHeight: cfg.Quality.DefaultMaxHeight,
 		MaxSizeMB:        cfg.Cache.MaxSizeMB,
+		MusicDir:         filepath.Join(configDir, "music"),
 	})
 	if err != nil {
 		log.Fatalf("engine: %v", err)

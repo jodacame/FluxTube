@@ -13,7 +13,7 @@ type mockProvider struct {
 	channels map[string][]VideoItem
 }
 
-func (m *mockProvider) Search(ctx context.Context, q, k string, n int) (Page, error) {
+func (m *mockProvider) Search(ctx context.Context, q, k string, n int, music bool) (Page, error) {
 	atomic.AddInt32(&m.calls, 1)
 	return Page{Videos: []VideoItem{{ID: "vvvvvvvvvvv", Title: q}}}, nil
 }
@@ -35,7 +35,7 @@ func TestServiceCaches(t *testing.T) {
 	m := &mockProvider{}
 	s := NewService(m, time.Minute)
 	for i := 0; i < 5; i++ {
-		if _, err := s.Search(context.Background(), "same", "", 10); err != nil {
+		if _, err := s.Search(context.Background(), "same", "", 10, false); err != nil {
 			t.Fatal(err)
 		}
 	}

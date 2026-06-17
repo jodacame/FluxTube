@@ -10,6 +10,8 @@ export interface VideoDTO {
   addedAt: number;
   active: boolean;
   state: string;
+  kind: string; // "video" | "music"
+  audioReady: boolean;
 }
 
 export interface VideoFormat {
@@ -62,7 +64,7 @@ export interface Settings {
 
 export type RuleField = "channel" | "title" | "videoId";
 export type RuleOp = "equals" | "contains" | "regex";
-export type RuleAction = "reject" | "maxQuality" | "preferAudioLang" | "preferSubLang" | "cache" | "ephemeral";
+export type RuleAction = "reject" | "maxQuality" | "preferAudioLang" | "preferSubLang" | "cache" | "ephemeral" | "music";
 export interface Rule {
   match: { field: RuleField; op: RuleOp; value: string };
   action: RuleAction;
@@ -112,11 +114,11 @@ export const api = {
 
   // library
   list: () => fetch("/api/videos").then((r) => j<VideoDTO[]>(r)),
-  add: (input: string) =>
+  add: (input: string, music = false) =>
     fetch("/api/videos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(/^https?:/.test(input) ? { url: input } : { id: input }),
+      body: JSON.stringify({ ...(/^https?:/.test(input) ? { url: input } : { id: input }), music }),
     }).then((r) => j<VideoDTO>(r)),
   get: (id: string) => fetch(`/api/videos/${id}`).then((r) => j<Resolved>(r)),
   stop: (id: string) => fetch(`/api/videos/${id}/stop`, { method: "POST" }),
@@ -131,7 +133,8 @@ export const api = {
     fetch("/api/rules", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rules) }).then((r) => j<Rule[]>(r)),
 
   // discovery
-  search: (q: string, limit = 24) => fetch(`/api/discover/search?q=${encodeURIComponent(q)}&limit=${limit}`).then((r) => j<DiscoverPage>(r)),
+  search: (q: string, music = false, limit = 24) =>
+    fetch(`/api/discover/search?q=${encodeURIComponent(q)}&limit=${limit}${music ? "&music=1" : ""}`).then((r) => j<DiscoverPage>(r)),
   trending: () => fetch(`/api/discover/trending`).then((r) => j<DiscoverPage>(r)),
   channel: (id: string) => fetch(`/api/discover/channel/${encodeURIComponent(id)}`).then((r) => j<ChannelInfo>(r)),
   channelVideos: (id: string, page = 1) => fetch(`/api/discover/channel/${encodeURIComponent(id)}/videos?page=${page}`).then((r) => j<DiscoverPage>(r)),
@@ -143,4 +146,5 @@ export const api = {
   masterUrl: (id: string, q?: number) => `${location.origin}/stream/${id}/master.m3u8${q ? `?q=${q}` : ""}`,
   progressiveUrl: (id: string) => `${location.origin}/stream/${id}/progressive`,
   subUrl: (id: string, lang: string) => `${location.origin}/stream/${id}/sub/${encodeURIComponent(lang)}.vtt`,
+  audioUrl: (id: string) => `${location.origin}/stream/${id}/audio.m4a`,
 };

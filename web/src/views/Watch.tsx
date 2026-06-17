@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { Bookmark } from "lucide-react";
+import { useParams, useSearchParams, Link } from "react-router-dom";
+import { Bookmark, Music } from "lucide-react";
 import { api, type Resolved, type DiscoverVideo } from "@/api";
 import { history } from "@/store";
 import { fmtViews } from "@/util";
@@ -9,6 +9,8 @@ import { Spinner } from "@/components/ui";
 
 export function Watch() {
   const { id = "" } = useParams();
+  const [params] = useSearchParams();
+  const audio = params.get("audio") === "1";
   const [info, setInfo] = useState<Resolved | null>(null);
   const [related, setRelated] = useState<DiscoverVideo[]>([]);
   const [err, setErr] = useState("");
@@ -44,6 +46,8 @@ export function Watch() {
           <div className="flex aspect-video items-center justify-center rounded-lg border border-border p-4 text-center text-sm text-red-400">
             {err}
           </div>
+        ) : audio ? (
+          <AudioPlayer id={id} title={info?.title} channel={info?.channel} thumbnail={info?.thumbnail} />
         ) : (
           <Player id={id} subs={info?.subs ?? []} poster={info?.thumbnail} />
         )}
@@ -55,7 +59,7 @@ export function Watch() {
               <Link to={`/app/channel/${info.channelId}`} className="text-sm font-medium text-muted-foreground hover:text-foreground">
                 {info.channel}
               </Link>
-              <SaveButton id={id} />
+              <SaveButton id={id} music={audio} />
             </div>
             <div className="flex flex-wrap gap-2 pt-1 text-xs text-muted-foreground">
               {info.video[0] && <Badge>{info.video[0].label}</Badge>}
@@ -86,9 +90,26 @@ export function Watch() {
   );
 }
 
+// AudioPlayer plays the persistent, universal audio file (music mode).
+function AudioPlayer({ id, title, channel, thumbnail }: { id: string; title?: string; channel?: string; thumbnail?: string }) {
+  return (
+    <div className="flex flex-col items-center gap-4 rounded-lg border border-border bg-card p-6">
+      {thumbnail && <img src={thumbnail} alt="" className="aspect-video w-full max-w-md rounded-lg object-cover" />}
+      <div className="text-center">
+        <p className="flex items-center justify-center gap-1.5 font-semibold">
+          <Music className="size-4 text-primary" /> {title || id}
+        </p>
+        {channel && <p className="text-sm text-muted-foreground">{channel}</p>}
+      </div>
+      <audio key={`aud-${id}`} src={api.audioUrl(id)} controls autoPlay className="w-full max-w-md" />
+      <p className="text-xs text-muted-foreground">Audio only · stored once for instant replay</p>
+    </div>
+  );
+}
+
 // SaveButton adds or removes the video from the persistent library. Playing a
 // video never saves it; saving is always an explicit action.
-function SaveButton({ id }: { id: string }) {
+function SaveButton({ id, music }: { id: string; music?: boolean }) {
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -104,7 +125,7 @@ function SaveButton({ id }: { id: string }) {
         await api.remove(id);
         setSaved(false);
       } else {
-        await api.add(id);
+        await api.add(id, music);
         setSaved(true);
       }
     } catch {

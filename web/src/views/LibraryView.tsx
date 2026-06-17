@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { Play, Square, Trash2 } from "lucide-react";
+import { Play, Square, Trash2, Music } from "lucide-react";
 import { api, type VideoDTO, type Resolved } from "@/api";
 import { fmtDuration } from "@/util";
 import { Button, Spinner } from "@/components/ui";
@@ -48,7 +48,10 @@ export function LibraryView() {
                   className={`cursor-pointer border-b border-border last:border-0 ${selected === v.id ? "bg-primary/10" : "hover:bg-accent/40"}`}
                 >
                   <td className="max-w-md px-3 py-2">
-                    <span className="line-clamp-1 font-medium">{v.title || v.id}</span>
+                    <span className="line-clamp-1 font-medium">
+                      {v.kind === "music" && <Music className="mr-1 inline size-3.5 text-primary" />}
+                      {v.title || v.id}
+                    </span>
                     {v.duration > 0 && <span className="ml-2 text-xs tabular text-muted-foreground">{fmtDuration(v.duration)}</span>}
                   </td>
                   <td className="px-3 py-2 text-muted-foreground">{v.channel}</td>
@@ -57,7 +60,7 @@ export function LibraryView() {
                   </td>
                   <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-end gap-1">
-                      <Link to={`/app/watch/${v.id}`}>
+                      <Link to={`/app/watch/${v.id}${v.kind === "music" ? "?audio=1" : ""}`}>
                         <Button variant="ghost" size="icon" title="Play">
                           <Play className="size-4" />
                         </Button>
