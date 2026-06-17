@@ -26,10 +26,17 @@ func (s *Server) spaHandler() http.Handler {
 			p = "index.html"
 		}
 		if _, err := fs.Stat(s.ui, p); err != nil {
+			// Unknown path → SPA entry point. index.html must not be cached so a
+			// redeployed UI (new hashed asset names) is picked up immediately.
+			w.Header().Set("Cache-Control", "no-cache")
 			r2 := r.Clone(r.Context())
 			r2.URL.Path = "/"
 			http.ServeFileFS(w, r2, s.ui, "index.html")
 			return
+		}
+		// Hashed assets are immutable; index.html itself must always revalidate.
+		if p == "index.html" {
+			w.Header().Set("Cache-Control", "no-cache")
 		}
 		fileServer.ServeHTTP(w, r)
 	})
