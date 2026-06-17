@@ -99,9 +99,24 @@ func (s *Server) getVideo(w http.ResponseWriter, r *http.Request) {
 		entry.Thumbnail = res.Thumbnail
 		entry.Duration = res.Duration
 		_ = s.store.AddEntry(entry)
+	} else if res.Music && s.store.Get().Music.AutoSave {
+		// Intelligent auto-save: a played video detected as music is saved as
+		// music and its audio persisted, with no rule needed.
+		s.autoSaveMusic(res)
 	}
 
 	writeJSON(w, http.StatusOK, res)
+}
+
+// autoSaveMusic stores a detected song as music and persists its audio.
+func (s *Server) autoSaveMusic(res *extractor.Resolved) {
+	entry := config.Entry{
+		ID: res.ID, Title: res.Title, Channel: res.Channel, ChannelID: res.ChannelID,
+		Thumbnail: res.Thumbnail, Duration: res.Duration, Kind: "music", AddedAt: time.Now().Unix(),
+	}
+	_ = s.store.AddEntry(entry)
+	go func() { _, _ = s.eng.AudioFile(context.Background(), res.ID) }()
+	s.hub.broadcast(event{Type: "added", ID: res.ID})
 }
 
 // stopVideo tears down the live session without removing the library entry.

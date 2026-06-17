@@ -17,6 +17,7 @@ type rawInfo struct {
 	Duration          float64                  `json:"duration"`
 	Thumbnail         string                   `json:"thumbnail"`
 	Description       string                   `json:"description"`
+	Categories        []string                 `json:"categories"`
 	Formats           []rawFormat              `json:"formats"`
 	Subtitles         map[string][]rawSubtitle `json:"subtitles"`
 	AutomaticCaptions map[string][]rawSubtitle `json:"automatic_captions"`
@@ -60,6 +61,7 @@ func parseInfo(r *rawInfo, allowedAuto map[string]bool) *Resolved {
 			Duration:    int(r.Duration + 0.5),
 			Thumbnail:   r.Thumbnail,
 			Description: r.Description,
+			Music:       detectMusic(r),
 		},
 	}
 
@@ -246,6 +248,18 @@ func subName(s rawSubtitle, lang string) string {
 		return s.Name
 	}
 	return lang
+}
+
+// detectMusic guesses whether a video is a song using reliable signals: the
+// YouTube "Music" category and auto-generated artist channels ("- Topic", Vevo).
+func detectMusic(r *rawInfo) bool {
+	for _, c := range r.Categories {
+		if strings.EqualFold(c, "Music") {
+			return true
+		}
+	}
+	ch := strings.ToLower(firstNonEmpty(r.Channel, r.Uploader))
+	return strings.HasSuffix(ch, "- topic") || strings.Contains(ch, "vevo")
 }
 
 // baseLang returns the primary subtag of a language code (e.g. "es" for "es-419").

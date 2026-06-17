@@ -18,6 +18,7 @@ type Meta struct {
 	Duration    int    `json:"duration"` // seconds
 	Thumbnail   string `json:"thumbnail"`
 	Description string `json:"description,omitempty"`
+	Music       bool   `json:"music"` // auto-detected as a song / music track
 }
 
 // VideoFormat is a single video-only (or progressive) rendition.

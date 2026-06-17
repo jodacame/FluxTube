@@ -57,6 +57,24 @@ export function SettingsView() {
         </Field>
       </Card>
 
+      <Card className="space-y-3 p-4">
+        <h3 className="font-semibold">Music</h3>
+        <label className="flex items-center gap-3 text-sm">
+          <input
+            type="checkbox"
+            className="size-4 accent-[var(--primary)]"
+            checked={s.music.autoSave}
+            onChange={(e) => setS({ ...s, music: { ...s.music, autoSave: e.target.checked } })}
+          />
+          <span>
+            Auto-save audio when it's music
+            <span className="block text-xs text-muted-foreground">
+              Detects songs (Music category, “- Topic”/Vevo channels) and saves the audio automatically for instant replay.
+            </span>
+          </span>
+        </label>
+      </Card>
+
       <Card className="space-y-4 p-4">
         <h3 className="font-semibold">YouTube</h3>
         <Field label="Cookies file (optional, unlocks restricted videos)">

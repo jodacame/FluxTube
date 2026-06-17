@@ -59,6 +59,7 @@ export interface Settings {
   youtube: { cookiesFile: string; extractorArg: string };
   discovery: { provider: string; invidiousBaseUrl: string; cacheSeconds: number };
   limits: { maxSessions: number; maxFFmpeg: number; idleTimeoutSec: number };
+  music: { autoSave: boolean };
   apiToken: string;
 }
 

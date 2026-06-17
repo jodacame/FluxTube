@@ -94,16 +94,27 @@ func (p *YtDlpProvider) run(ctx context.Context, target string, items string) (*
 }
 
 func (p *YtDlpProvider) Search(ctx context.Context, query, kind string, limit int, music bool) (Page, error) {
-	spec := fmt.Sprintf("ytsearch%d:%s", limit, query)
-	res, err := p.run(ctx, spec, "")
+	if music {
+		// Query the official YouTube Music catalog, which only contains official
+		// songs/videos, so the top result is the official track. Fall back to a
+		// ranked general search if it yields nothing.
+		if res, err := p.run(ctx, "https://music.youtube.com/search?q="+url.QueryEscape(query), fmt.Sprintf("1-%d", limit)); err == nil {
+			if v := toVideos(res.Entries); len(v) > 0 {
+				return Page{Videos: v}, nil
+			}
+		}
+		res, err := p.run(ctx, fmt.Sprintf("ytsearch%d:%s", limit, query), "")
+		if err != nil {
+			return Page{}, err
+		}
+		return Page{Videos: rankMusic(toVideos(res.Entries))}, nil
+	}
+
+	res, err := p.run(ctx, fmt.Sprintf("ytsearch%d:%s", limit, query), "")
 	if err != nil {
 		return Page{}, err
 	}
-	videos := toVideos(res.Entries)
-	if music {
-		videos = rankMusic(videos)
-	}
-	return Page{Videos: videos}, nil
+	return Page{Videos: toVideos(res.Entries)}, nil
 }
 
 // rankMusic reorders results to surface official song audio/video first, the
