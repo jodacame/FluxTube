@@ -88,10 +88,3 @@ func TestParseInfoAdaptive(t *testing.T) {
 		t.Errorf("BestAudio = %+v ok=%v, want 160k", best, ok)
 	}
 }
-
-func TestLanguages(t *testing.T) {
-	r := &Resolved{Audio: []AudioTrack{{Lang: "en"}, {Lang: "es"}, {Lang: "en"}}}
-	if got := r.Languages(); len(got) != 2 {
-		t.Errorf("languages = %v, want 2 distinct", got)
-	}
-}

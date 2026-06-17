@@ -94,16 +94,3 @@ func (r *Resolved) BestAudio() (AudioTrack, bool) {
 	}
 	return best, found
 }
-
-// Languages returns the distinct audio languages available.
-func (r *Resolved) Languages() []string {
-	seen := map[string]bool{}
-	var out []string
-	for _, a := range r.Audio {
-		if a.Lang != "" && !seen[a.Lang] {
-			seen[a.Lang] = true
-			out = append(out, a.Lang)
-		}
-	}
-	return out
-}

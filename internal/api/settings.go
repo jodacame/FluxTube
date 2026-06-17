@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/jodacame/fluxtube/internal/config"
 	"github.com/jodacame/fluxtube/internal/rules"
@@ -46,7 +47,7 @@ func (s *Server) putRules(w http.ResponseWriter, r *http.Request) {
 	}
 	for i, rule := range list {
 		if !rule.Valid() {
-			writeErr(w, http.StatusBadRequest, "invalid rule at index "+itoa(i))
+			writeErr(w, http.StatusBadRequest, "invalid rule at index "+strconv.Itoa(i))
 			return
 		}
 	}
@@ -68,26 +69,4 @@ func maskToken(t string) string {
 		return ""
 	}
 	return "********"
-}
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	neg := n < 0
-	if neg {
-		n = -n
-	}
-	var b [20]byte
-	i := len(b)
-	for n > 0 {
-		i--
-		b[i] = byte('0' + n%10)
-		n /= 10
-	}
-	if neg {
-		i--
-		b[i] = '-'
-	}
-	return string(b[i:])
 }

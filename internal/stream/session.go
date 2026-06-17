@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -202,22 +203,22 @@ func (s *session) runFFmpeg(r *rendition, base int, ctx context.Context) {
 		"-user_agent", ua,
 	}
 	if base > 0 {
-		args = append(args, "-ss", itoa(base*seg))
+		args = append(args, "-ss", strconv.Itoa(base*seg))
 	}
 	args = append(args, "-i", r.src, "-map", "0", "-c", "copy")
 	if base > 0 {
 		// Place the restarted segments at their real position on the timeline
 		// (input -ss reset timestamps to 0) without copying odd source ts.
-		args = append(args, "-output_ts_offset", itoa(base*seg))
+		args = append(args, "-output_ts_offset", strconv.Itoa(base*seg))
 	}
 	args = append(args,
 		"-f", "hls",
-		"-hls_time", itoa(seg),
+		"-hls_time", strconv.Itoa(seg),
 		"-hls_list_size", "0",
 		"-hls_flags", "independent_segments+append_list+omit_endlist",
 		"-hls_segment_type", "fmp4",
 		"-hls_fmp4_init_filename", "init.mp4",
-		"-start_number", itoa(base),
+		"-start_number", strconv.Itoa(base),
 		"-hls_segment_filename", filepath.Join(r.dir, "seg%05d.m4s"),
 		filepath.Join(r.dir, "_ff.m3u8"),
 	)
