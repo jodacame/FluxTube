@@ -95,6 +95,9 @@ func parseInfo(r *rawInfo, allowedAuto map[string]bool) *Resolved {
 		}
 	}
 
+	// Keep the full (non-deduped) audio list before collapsing to one per
+	// language, so music can pick the best AAC across all formats.
+	res.AllAudio = append([]AudioTrack(nil), res.Audio...)
 	dedupeAudioByLang(res)
 	res.Subs = collectSubs(r, allowedAuto)
 
@@ -104,6 +107,9 @@ func parseInfo(r *rawInfo, allowedAuto map[string]bool) *Resolved {
 	}
 	if res.Audio == nil {
 		res.Audio = []AudioTrack{}
+	}
+	if res.AllAudio == nil {
+		res.AllAudio = []AudioTrack{}
 	}
 	if res.Progressive == nil {
 		res.Progressive = []VideoFormat{}

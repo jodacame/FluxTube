@@ -61,10 +61,36 @@ type Resolved struct {
 	Meta
 	Video       []VideoFormat `json:"video"`
 	Audio       []AudioTrack  `json:"audio"`
+	AllAudio    []AudioTrack  `json:"-"` // every audio format (not deduped); for best-track selection
 	Subs        []SubTrack    `json:"subs"`
 	Progressive []VideoFormat `json:"progressive"`
 	ResolvedAt  time.Time     `json:"resolvedAt"`
 	ExpiresAt   time.Time     `json:"expiresAt"`
+}
+
+// BestAAC returns the highest-bitrate AAC audio track (universally playable),
+// or false if none is available.
+func (r *Resolved) BestAAC() (AudioTrack, bool) {
+	var best AudioTrack
+	found := false
+	for _, a := range r.AllAudio {
+		if a.Codec == "aac" && (!found || a.Bitrate > best.Bitrate) {
+			best, found = a, true
+		}
+	}
+	return best, found
+}
+
+// BestAudio returns the highest-bitrate audio track regardless of codec.
+func (r *Resolved) BestAudio() (AudioTrack, bool) {
+	var best AudioTrack
+	found := false
+	for _, a := range r.AllAudio {
+		if !found || a.Bitrate > best.Bitrate {
+			best, found = a, true
+		}
+	}
+	return best, found
 }
 
 // Languages returns the distinct audio languages available.

@@ -79,6 +79,14 @@ func TestParseInfoAdaptive(t *testing.T) {
 	if !strings.Contains(res.Subs[0].URL, "fmt=vtt") {
 		t.Errorf("subtitle url not forced to vtt: %s", res.Subs[0].URL)
 	}
+
+	// Best-track selection scans all (non-deduped) audio formats.
+	if aac, ok := res.BestAAC(); !ok || aac.Codec != "aac" || aac.Bitrate != 48 {
+		t.Errorf("BestAAC = %+v ok=%v, want aac 48k", aac, ok)
+	}
+	if best, ok := res.BestAudio(); !ok || best.Bitrate != 160 {
+		t.Errorf("BestAudio = %+v ok=%v, want 160k", best, ok)
+	}
 }
 
 func TestLanguages(t *testing.T) {

@@ -31,20 +31,15 @@ func (e *Engine) AudioFile(ctx context.Context, id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if len(res.Audio) == 0 {
-		return "", errors.New("no audio track available")
-	}
-
-	// Prefer a native AAC track (lossless copy); otherwise transcode the best
-	// available audio to AAC so the output is always universally compatible.
-	src := res.Audio[0]
-	copyCodec := false
-	for _, a := range res.Audio {
-		if a.Codec == "aac" {
-			src = a
-			copyCodec = true
-			break
+	// Prefer the highest-bitrate AAC track (lossless copy, universally playable);
+	// only if no AAC exists, transcode the best available audio to AAC.
+	src, copyCodec := res.BestAAC()
+	if !copyCodec {
+		best, ok := res.BestAudio()
+		if !ok {
+			return "", errors.New("no audio track available")
 		}
+		src = best
 	}
 
 	tmp := path + ".tmp"
