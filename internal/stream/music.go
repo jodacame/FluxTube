@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 )
 
 // AudioFile returns the path to a persistent, universally-playable audio file
@@ -73,6 +74,9 @@ func (e *Engine) ServeAudio(ctx context.Context, w http.ResponseWriter, r *http.
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return nil
 	}
+	e.accessMu.Lock()
+	e.audioAccess[id] = time.Now()
+	e.accessMu.Unlock()
 	w.Header().Set("Content-Type", "audio/mp4")
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	http.ServeFile(w, r, path)
@@ -82,6 +86,15 @@ func (e *Engine) ServeAudio(ctx context.Context, w http.ResponseWriter, r *http.
 // HasAudioFile reports whether a persistent audio file already exists.
 func (e *Engine) HasAudioFile(id string) bool {
 	return fileExists(filepath.Join(e.opt.MusicDir, id+".m4a"))
+}
+
+// AudioActive reports whether a music track was served recently enough to be
+// considered currently playing.
+func (e *Engine) AudioActive(id string) bool {
+	e.accessMu.Lock()
+	t, ok := e.audioAccess[id]
+	e.accessMu.Unlock()
+	return ok && time.Since(t) < audioActiveWindow
 }
 
 // SetMusicDir updates the persistent music directory at runtime.

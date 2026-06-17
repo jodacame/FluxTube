@@ -82,8 +82,15 @@ type Engine struct {
 
 	audioMu sync.Mutex // serialises music (audio-only) preparation
 
+	accessMu    sync.Mutex
+	audioAccess map[string]time.Time // last time each music track was served
+
 	stopGC chan struct{}
 }
+
+// audioActiveWindow is how long after the last audio request a music track is
+// still considered "now playing" (covers a song buffered in one fetch).
+const audioActiveWindow = 5 * time.Minute
 
 // New creates a streaming engine bound to an extractor.
 func New(ex *extractor.Extractor, opt Options) (*Engine, error) {
@@ -97,11 +104,12 @@ func New(ex *extractor.Extractor, opt Options) (*Engine, error) {
 	_ = os.MkdirAll(opt.MusicDir, 0o755)
 
 	e := &Engine{
-		ex:       ex,
-		opt:      opt,
-		sem:      make(chan struct{}, opt.MaxFFmpeg),
-		sessions: map[string]*session{},
-		stopGC:   make(chan struct{}),
+		ex:          ex,
+		opt:         opt,
+		sem:         make(chan struct{}, opt.MaxFFmpeg),
+		sessions:    map[string]*session{},
+		audioAccess: map[string]time.Time{},
+		stopGC:      make(chan struct{}),
 	}
 	go e.gcLoop()
 	return e, nil
@@ -176,6 +184,18 @@ func (e *Engine) ActiveCount() int {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return len(e.sessions)
+}
+
+// ActiveStreams returns metadata for every live (HLS) streaming session, so the
+// UI can show what is streaming even when it was never saved.
+func (e *Engine) ActiveStreams() []extractor.Meta {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	out := make([]extractor.Meta, 0, len(e.sessions))
+	for _, s := range e.sessions {
+		out = append(out, s.res.Meta)
+	}
+	return out
 }
 
 func (e *Engine) evictLRULocked() {

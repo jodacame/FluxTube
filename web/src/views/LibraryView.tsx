@@ -20,10 +20,20 @@ export function LibraryView() {
     return () => ws.close();
   }, []);
 
+  // This screen shows only what is streaming right now (video or music). The
+  // saved music collection lives in the persistent store and is not listed here
+  // so it never grows into a giant list.
+  const shown = videos.filter((v) => v.active);
+  const savedSongs = videos.filter((v) => v.kind === "music").length;
+
   return (
     <PanelGroup direction="vertical" autoSaveId="ft-lib" className="h-full">
       <Panel defaultSize={64} minSize={25}>
         <div className="h-full overflow-auto">
+          <div className="flex items-center gap-1.5 border-b border-border px-3 py-1.5 text-xs text-muted-foreground">
+            <Music className="size-3.5 text-primary" />
+            Showing what's streaming now{savedSongs > 0 ? ` · ${savedSongs} ${savedSongs === 1 ? "song" : "songs"} saved` : ""}
+          </div>
           <table className="w-full text-sm">
             <thead className="sticky top-0 border-b border-border bg-card text-left text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
@@ -34,14 +44,14 @@ export function LibraryView() {
               </tr>
             </thead>
             <tbody>
-              {videos.length === 0 && (
+              {shown.length === 0 && (
                 <tr>
                   <td colSpan={4} className="px-3 py-12 text-center text-muted-foreground">
-                    No videos yet. Paste a YouTube link in the toolbar above.
+                    Nothing streaming right now. Play something from Discover.
                   </td>
                 </tr>
               )}
-              {videos.map((v) => (
+              {shown.map((v) => (
                 <tr
                   key={v.id}
                   onClick={() => setSelected(v.id)}

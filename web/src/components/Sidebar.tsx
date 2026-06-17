@@ -1,10 +1,10 @@
 import { Link, useLocation } from "react-router-dom";
-import { Compass, Library, ScrollText, Settings as SettingsIcon } from "lucide-react";
+import { Compass, Radio, ScrollText, Settings as SettingsIcon } from "lucide-react";
 import { cn } from "@/util";
 
 export const NAV = [
   { to: "/app", label: "Discover", icon: Compass, match: (p: string) => p.startsWith("/app") },
-  { to: "/", label: "Library", icon: Library, match: (p: string) => p === "/" },
+  { to: "/", label: "Streaming", icon: Radio, match: (p: string) => p === "/" },
   { to: "/rules", label: "Rules", icon: ScrollText, match: (p: string) => p === "/rules" },
   { to: "/settings", label: "Settings", icon: SettingsIcon, match: (p: string) => p === "/settings" },
 ];

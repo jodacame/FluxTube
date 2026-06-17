@@ -19,7 +19,7 @@ type videoDTO struct {
 }
 
 func (s *Server) toDTO(e config.Entry) videoDTO {
-	active := s.eng.Active(e.ID)
+	active := s.eng.Active(e.ID) || s.eng.AudioActive(e.ID)
 	state := "idle"
 	if active {
 		state = "streaming"
@@ -71,12 +71,29 @@ func (s *Server) addVideo(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.toDTO(entry))
 }
 
-// listVideos returns the library merged with live playback state.
+// listVideos returns saved entries merged with live playback state, plus any
+// active stream that was never saved (so it shows up while streaming).
 func (s *Server) listVideos(w http.ResponseWriter, r *http.Request) {
 	entries := s.store.ListEntries()
 	out := make([]videoDTO, 0, len(entries))
+	seen := make(map[string]bool, len(entries))
 	for _, e := range entries {
+		seen[e.ID] = true
 		out = append(out, s.toDTO(e))
+	}
+	for _, m := range s.eng.ActiveStreams() {
+		if seen[m.ID] {
+			continue
+		}
+		kind := "video"
+		if m.Music {
+			kind = "music"
+		}
+		out = append(out, videoDTO{
+			Entry:  config.Entry{ID: m.ID, Title: m.Title, Channel: m.Channel, ChannelID: m.ChannelID, Thumbnail: m.Thumbnail, Duration: m.Duration, Kind: kind},
+			Active: true,
+			State:  "streaming",
+		})
 	}
 	writeJSON(w, http.StatusOK, out)
 }
