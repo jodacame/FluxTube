@@ -38,9 +38,9 @@ export function StatusBar() {
         <Activity className="size-3" /> {active} active
       </span>
       <div className="mx-1 hidden h-3.5 w-px bg-border sm:block" />
-      <a href={REPO} target="_blank" rel="noreferrer" className="hidden items-center gap-1.5 transition-colors hover:text-foreground sm:flex" title="GitHub">
+      <a href={REPO} target="_blank" rel="noreferrer" className="hidden items-center gap-1.5 transition-colors hover:text-foreground sm:flex" title={`FluxTube ${version}`}>
         <GitHubMark className="size-3.5" />
-        <span className="tabular">{version}</span>
+        <span>GitHub</span>
       </a>
       <a href={SPONSOR} target="_blank" rel="noreferrer" className="hidden items-center gap-1 text-pink-400 transition-opacity hover:opacity-80 sm:flex" title="Sponsor">
         <Heart className="size-3 fill-current" /> Sponsor
