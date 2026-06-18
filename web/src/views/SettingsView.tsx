@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { HardDrive, Music } from "lucide-react";
+import { HardDrive, Music, Trash2 } from "lucide-react";
 import { api, type Settings, type Storage } from "@/api";
 import { fmtSize } from "@/util";
 import { Button, Input, Card, Spinner } from "@/components/ui";
@@ -8,6 +8,7 @@ export function SettingsView() {
   const [s, setS] = useState<Settings | null>(null);
   const [storage, setStorage] = useState<Storage | null>(null);
   const [saved, setSaved] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [err, setErr] = useState("");
 
   useEffect(() => {
@@ -32,6 +33,19 @@ export function SettingsView() {
       setTimeout(() => setSaved(false), 1500);
     } catch (e) {
       setErr((e as Error).message);
+    }
+  };
+
+  const clearMusic = async () => {
+    if (!confirm("Delete ALL saved music? This removes every stored audio file and cannot be undone.")) return;
+    setClearing(true);
+    try {
+      await api.clearMusic();
+      setStorage(await api.storage());
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setClearing(false);
     }
   };
 
@@ -108,6 +122,16 @@ export function SettingsView() {
                 </div>
               </>
             )}
+            <div className="flex items-center justify-between border-t border-border pt-2">
+              <span className="text-xs text-muted-foreground">Remove all saved music files</span>
+              <button
+                onClick={clearMusic}
+                disabled={clearing || storage.musicCount === 0}
+                className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10 disabled:opacity-40"
+              >
+                <Trash2 className="size-3.5" /> {clearing ? "Clearing…" : "Clear music"}
+              </button>
+            </div>
           </div>
         )}
       </Card>

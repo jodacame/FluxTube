@@ -121,6 +121,7 @@ async function j<T>(res: Response): Promise<T> {
 export const api = {
   health: () => fetch("/api/health").then((r) => j<{ version: string; activeSessions: number }>(r)),
   storage: () => fetch("/api/storage").then((r) => j<Storage>(r)),
+  clearMusic: () => fetch("/api/music", { method: "DELETE" }).then((r) => j<{ removed: number }>(r)),
 
   // library
   list: () => fetch("/api/videos").then((r) => j<VideoDTO[]>(r)),

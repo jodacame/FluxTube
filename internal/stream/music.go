@@ -136,6 +136,30 @@ func (e *Engine) MusicDir() string {
 	return e.opt.MusicDir
 }
 
+// ClearMusic deletes every stored music file and returns how many were removed.
+func (e *Engine) ClearMusic() (int, error) {
+	dir := e.MusicDir()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	n := 0
+	for _, en := range entries {
+		if !en.IsDir() && filepath.Ext(en.Name()) == ".m4a" {
+			if os.Remove(filepath.Join(dir, en.Name())) == nil {
+				n++
+			}
+		}
+	}
+	e.accessMu.Lock()
+	e.audioAccess = map[string]time.Time{}
+	e.accessMu.Unlock()
+	return n, nil
+}
+
 // AudioActive reports whether a music track was served recently enough to be
 // considered currently playing.
 func (e *Engine) AudioActive(id string) bool {

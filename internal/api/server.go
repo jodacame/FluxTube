@@ -65,6 +65,7 @@ func (s *Server) Handler() http.Handler {
 	// System.
 	mux.HandleFunc("GET /api/health", s.health)
 	mux.HandleFunc("GET /api/storage", s.storage)
+	mux.HandleFunc("DELETE /api/music", s.clearMusic)
 	mux.HandleFunc("GET /api/events", s.hub.serveWS)
 
 	// Discovery (registered separately so the feature can evolve independently).
