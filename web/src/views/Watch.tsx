@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { Bookmark, Music } from "lucide-react";
 import { api, type Resolved, type DiscoverVideo } from "@/api";
@@ -87,8 +87,35 @@ export function Watch() {
   );
 }
 
-// AudioPlayer plays the persistent, universal audio file (music mode).
+// AudioPlayer plays the persistent, universal audio file (music mode). The first
+// play may take a few seconds while the audio is prepared; if the element errors
+// (e.g. a transient upstream hiccup) it retries automatically.
 function AudioPlayer({ id, title, channel, thumbnail }: { id: string; title?: string; channel?: string; thumbnail?: string }) {
+  const ref = useRef<HTMLAudioElement>(null);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const tries = useRef(0);
+
+  useEffect(() => {
+    tries.current = 0;
+    setStatus("loading");
+  }, [id]);
+
+  const onError = () => {
+    if (tries.current >= 3) {
+      setStatus("error");
+      return;
+    }
+    tries.current++;
+    setStatus("loading");
+    setTimeout(() => {
+      const el = ref.current;
+      if (el) {
+        el.load();
+        el.play().catch(() => {});
+      }
+    }, 1200);
+  };
+
   return (
     <div className="flex flex-col items-center gap-4 rounded-lg border border-border bg-card p-6">
       {thumbnail && <img src={thumbnail} alt="" className="aspect-video w-full max-w-md rounded-lg object-cover" />}
@@ -98,8 +125,20 @@ function AudioPlayer({ id, title, channel, thumbnail }: { id: string; title?: st
         </p>
         {channel && <p className="text-sm text-muted-foreground">{channel}</p>}
       </div>
-      <audio key={`aud-${id}`} src={api.audioUrl(id)} controls autoPlay className="w-full max-w-md" />
-      <p className="text-xs text-muted-foreground">Audio only · stored once for instant replay</p>
+      <audio
+        ref={ref}
+        key={`aud-${id}`}
+        src={api.audioUrl(id)}
+        controls
+        autoPlay
+        onCanPlay={() => setStatus("ready")}
+        onPlaying={() => setStatus("ready")}
+        onError={onError}
+        className="w-full max-w-md"
+      />
+      {status === "loading" && <p className="text-xs text-muted-foreground">Preparing audio…</p>}
+      {status === "error" && <p className="text-xs text-red-400">Could not load audio. Try reloading.</p>}
+      {status === "ready" && <p className="text-xs text-muted-foreground">Audio only · stored once for instant replay</p>}
     </div>
   );
 }

@@ -84,6 +84,10 @@ type Engine struct {
 
 	dirMu sync.RWMutex // guards the music directory path (independent of audioMu)
 
+	storageMu    sync.Mutex
+	storageCache Storage   // cached music/disk usage to avoid scanning on every poll
+	storageAt    time.Time // when storageCache was computed
+
 	accessMu    sync.Mutex
 	audioAccess map[string]time.Time // last time each music track was served
 

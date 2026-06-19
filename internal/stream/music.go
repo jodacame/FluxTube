@@ -12,10 +12,25 @@ import (
 	"github.com/jodacame/fluxtube/internal/extractor"
 )
 
-// audioPath returns the stored audio file for an id, if present.
+// shardPath returns the on-disk location for a music file, sharded into a
+// sub-directory by the id prefix so a single folder never holds thousands of
+// entries (which slows directory listing on most filesystems).
+func shardPath(dir, id string) string {
+	sub := "_"
+	if len(id) >= 2 {
+		sub = id[:2]
+	}
+	return filepath.Join(dir, sub, id+".m4a")
+}
+
+// audioPath returns the stored audio file for an id, if present (checking the
+// sharded location, then the legacy flat path for backward compatibility).
 func (e *Engine) audioPath(id string) (string, bool) {
-	p := filepath.Join(e.MusicDir(), id+".m4a")
-	if fileExists(p) {
+	dir := e.MusicDir()
+	if p := shardPath(dir, id); fileExists(p) {
+		return p, true
+	}
+	if p := filepath.Join(dir, id+".m4a"); fileExists(p) {
 		return p, true
 	}
 	return "", false
@@ -42,21 +57,33 @@ func (e *Engine) AudioFile(ctx context.Context, id string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 
-	path := filepath.Join(e.MusicDir(), id+".m4a")
+	path := shardPath(e.MusicDir(), id)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return "", err
+	}
 
 	// YouTube CDN URLs occasionally reject a request (transient 403/SABR). Retry
-	// once with a freshly resolved URL before giving up.
+	// a few times with a freshly resolved URL and a short backoff before giving up.
 	var lastErr error
-	for attempt := 0; attempt < 2; attempt++ {
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			e.ex.Drop(id) // force a fresh resolve
+			select {
+			case <-ctx.Done():
+				return "", ctx.Err()
+			case <-time.After(time.Second):
+			}
+		}
 		res, err := e.ex.Resolve(ctx, id)
 		if err != nil {
-			return "", err
+			lastErr = err
+			continue
 		}
 		if err := e.writeAudio(ctx, res, path); err != nil {
 			lastErr = err
-			e.ex.Drop(id) // force a fresh resolve on the next attempt
 			continue
 		}
+		e.invalidateStorage()
 		return path, nil
 	}
 	return "", lastErr
@@ -136,28 +163,26 @@ func (e *Engine) MusicDir() string {
 	return e.opt.MusicDir
 }
 
-// ClearMusic deletes every stored music file and returns how many were removed.
+// ClearMusic deletes every stored music file (across all shards) and returns
+// how many were removed.
 func (e *Engine) ClearMusic() (int, error) {
 	dir := e.MusicDir()
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return 0, nil
-		}
+	n, _ := musicUsage(dir) // count before wiping
+	if err := clearDir(dir); err != nil && !os.IsNotExist(err) {
 		return 0, err
-	}
-	n := 0
-	for _, en := range entries {
-		if !en.IsDir() && filepath.Ext(en.Name()) == ".m4a" {
-			if os.Remove(filepath.Join(dir, en.Name())) == nil {
-				n++
-			}
-		}
 	}
 	e.accessMu.Lock()
 	e.audioAccess = map[string]time.Time{}
 	e.accessMu.Unlock()
+	e.invalidateStorage()
 	return n, nil
+}
+
+// invalidateStorage forces the next Storage call to recompute usage.
+func (e *Engine) invalidateStorage() {
+	e.storageMu.Lock()
+	e.storageAt = time.Time{}
+	e.storageMu.Unlock()
 }
 
 // AudioActive reports whether a music track was served recently enough to be

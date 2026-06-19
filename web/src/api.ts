@@ -91,7 +91,6 @@ export interface DiscoverPage {
 export interface Storage {
   musicBytes: number;
   musicCount: number;
-  cacheBytes: number;
   freeBytes: number;
   totalBytes: number;
 }
