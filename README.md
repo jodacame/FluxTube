@@ -5,8 +5,10 @@
 **A simple, efficient, self-hosted YouTube → HTTP streaming bridge with a web UI.**
 
 Give it a YouTube video and FluxTube turns it into a **seekable HTTP stream** with
-selectable **audio and subtitle tracks** for any modern player — plus a headless,
-keyless **discovery API** to search and browse, and a built-in web client to watch.
+selectable **audio and subtitle tracks** for any modern player. It also doubles as a
+lightweight **music service** (audio-only, best quality, persistent) backed by the
+YouTube Music catalog, plus a headless, keyless **discovery API** and a built-in
+web client to search, browse and watch.
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker)](#-quick-start-docker)
@@ -24,6 +26,7 @@ keyless **discovery API** to search and browse, and a built-in web client to wat
 - [Features](#features)
 - [Quick start (Docker)](#-quick-start-docker)
 - [How it works](#how-it-works)
+- [Music mode](#-music-mode)
 - [Configuration](#configuration)
 - [API](#api)
 - [Building from source](#building-from-source)
@@ -39,9 +42,10 @@ stream** on demand, with multiple audio and subtitle tracks the player can choos
 from — like an MKV, but **seekable**. It also exposes a small **discovery API** so
 clients can search, browse channels and get recommendations.
 
-It is a **thin, mostly stateless bridge**: it stores no media, keeps only an
-ephemeral segment cache, and runs comfortably on modest hardware (a NAS or a small
-always-on box).
+It is a **thin, mostly stateless bridge**: video streaming stores no media (only an
+ephemeral segment cache), and it runs comfortably on modest hardware (a NAS or a
+small always-on box). The one thing it *does* keep, on purpose, is **saved music** —
+see [Music mode](#-music-mode).
 
 ## Features
 
@@ -50,7 +54,7 @@ always-on box).
 - ⏩ **Seekable** — segmented HLS means fast-forward/seek works in real players.
 - 🪶 **Efficient by design** — `-c copy` (no transcode), bounded ephemeral cache, idle sessions are torn down. Minimal upstream requests via aggressive caching and single-flight.
 - 🔎 **Headless discovery API** — keyless search, trending, channels, playlists, related and a stateless recommended feed (client owns its history/follows).
-- 🖥️ **Two web UIs in one** — a management dashboard (`/`) and a YouTube-like web client (`/app`) with an `hls.js` player and track selectors.
+- 🖥️ **Two web UIs in one** — a **Streaming** dashboard (`/`, shows what's playing now) and a YouTube-like web client (`/app`) with an `hls.js` player, track selectors and music mode.
 - 🧭 **Per-source rules** — match by channel / title / id → reject, cap quality, prefer audio/subtitle language, force cache/ephemeral, or mark as music.
 - 🎵 **Music mode** — search the official **YouTube Music** catalog and play **audio-only** in a universal AAC/`m4a` format; songs are stored once (persistent, optimal — no re-download) and can be auto-detected and auto-saved.
 - 🍪 **Optional cookies** — point to a cookies file to unlock restricted videos.
@@ -66,8 +70,9 @@ docker run -d --name fluxtube \
   ghcr.io/jodacame/fluxtube:latest
 ```
 
-Open **http://localhost:7002/app** to browse and watch, or **http://localhost:7002/**
-to manage the library, rules and settings.
+Open **http://localhost:7002/app** to search, browse and watch (toggle **🎵 Music**
+to play songs), or **http://localhost:7002/** for the Streaming dashboard, rules and
+settings.
 
 ### docker-compose
 
@@ -79,7 +84,7 @@ services:
     ports:
       - "7002:7002"
     volumes:
-      - ./config:/config      # settings, rules, optional cookies
+      - ./config:/config      # settings, rules, optional cookies, saved music
       - ./cache:/cache         # bounded ephemeral segment cache
     environment:
       - FT_LISTEN_PORT=7002
@@ -103,25 +108,40 @@ services:
 > image build). Without them, only a basic progressive format may be available. For
 > region- or sign-in-restricted videos, configure an optional cookies file.
 
-## Music mode
+## 🎵 Music mode
 
-FluxTube can act as a lightweight music service backed by YouTube:
+FluxTube can act as a lightweight, self-hosted music service backed by YouTube —
+think "your own YouTube Music".
 
-- In the web client (`/app`), toggle **🎵 Music** next to the search box. Searches then
-  hit the official **YouTube Music** catalog, so the top hit is the official track.
-- Playing a music result streams **audio only** as **AAC in an `.m4a` container**:
-  the highest-bitrate AAC track is **copied losslessly**; if YouTube exposes no
-  AAC, the best audio is transcoded to AAC. Served with range support so it plays
-  and seeks in **any player** (browser `<audio>`, VLC, mpv…): `GET /stream/<id>/audio`.
-- The audio is written **once** to a persistent store and served directly afterwards,
-  so a song is **never downloaded or processed twice**.
-- **Auto-save** (Settings → Music, on by default): videos detected as music — by the
-  YouTube *Music* category or auto-generated `- Topic`/Vevo channels — are saved as
-  music automatically, no rule required. You can also mark sources as music with a
-  **rule** (`action: music`).
-- The persistent store path is configurable (Settings → Music, env `FT_MUSIC_DIR`,
-  default `/config/music`). The status bar shows how much space the saved music uses
-  and the free disk space.
+**Find the official song.** In the web client (`/app`), toggle **🎵 Music** next to the
+search box. Searches then hit the official **YouTube Music** catalog, so the top hit
+is the official track/art-track rather than a random upload.
+
+**Best quality, any player.** Playing a music result streams **audio only**: the
+highest-bitrate AAC track is **copied losslessly** (no re-encoding) into an `.m4a`
+container with a front-loaded index; if YouTube exposes no AAC, the best audio is
+transcoded to AAC. The result plays and seeks in **any player** — a plain browser
+`<audio>`, VLC, mpv, etc.: `GET /stream/<id>/audio`. (Transient upstream hiccups are
+retried automatically.)
+
+**Saved once, never re-downloaded.** The audio is written **once** to a persistent
+store and served directly afterwards, so a song is fetched and processed only a
+single time. Files are **sharded into sub-folders** by id prefix
+(`/config/music/<ab>/<id>.m4a`) so the store stays fast even with thousands of songs.
+
+**Intelligent auto-save** (Settings → Music, on by default). Videos detected as music
+— by the YouTube *Music* category or auto-generated `- Topic` / Vevo channels — are
+saved automatically, no rule required. You can also mark sources as music explicitly
+with a **rule** (`action: music`), or save the current track from the player.
+
+**Manage it.** Settings → Music shows the **space used by saved music + free disk**,
+lets you configure the persistent path (env `FT_MUSIC_DIR`, default `/config/music`),
+and offers a **"Clear music"** action (with confirmation) to delete everything. The
+**Streaming** screen lists only what is playing right now (video or music); the saved
+collection lives in the store, not in that list.
+
+> Saved music persists under `/config/music`, so mounting the `/config` volume keeps
+> your library across restarts and upgrades.
 
 ## Configuration
 
