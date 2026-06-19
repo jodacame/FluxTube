@@ -8,11 +8,10 @@ web/dist/*
 node_modules/
 *.log
 
-# Runtime data
-/config
-/cache
-config/
-cache/
+# Runtime data (root-level only — must not match internal/config etc.)
+/config/
+/cache/
+/runtime/
 *.db
 
 # Secrets / local
