@@ -29,6 +29,7 @@ export function SettingsView() {
     try {
       const next = await api.putSettings(s);
       setS(next);
+      api.storage().then(setStorage).catch(() => {}); // path may have changed → refresh usage
       setSaved(true);
       setTimeout(() => setSaved(false), 1500);
     } catch (e) {

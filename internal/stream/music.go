@@ -153,6 +153,7 @@ func (e *Engine) SetMusicDir(dir string) {
 	e.opt.MusicDir = dir
 	e.dirMu.Unlock()
 	_ = os.MkdirAll(dir, 0o755)
+	e.invalidateStorage() // usage now reflects the new location
 }
 
 // MusicDir returns the current persistent music directory. It uses a dedicated
